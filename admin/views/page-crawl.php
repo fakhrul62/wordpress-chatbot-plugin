@@ -15,6 +15,15 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 		<div class="aichat-inline-status" id="aichat-crawl-status"></div>
 	</section>
 	<section class="aichat-card">
+		<h2><?php esc_html_e( 'Add Custom Knowledge', 'wp-aichat' ); ?></h2>
+		<form id="aichat-custom-knowledge-form">
+			<label><?php esc_html_e( 'Title or question', 'wp-aichat' ); ?><input type="text" name="title" required></label>
+			<label><?php esc_html_e( 'Answer or fact', 'wp-aichat' ); ?><textarea name="content" rows="4" required></textarea></label>
+			<button type="submit" class="aichat-button aichat-button-primary"><?php esc_html_e( 'Add Knowledge', 'wp-aichat' ); ?></button>
+			<div class="aichat-inline-status" id="aichat-custom-knowledge-status"></div>
+		</form>
+	</section>
+	<section class="aichat-card">
 		<div class="aichat-card-head">
 			<h2><?php esc_html_e( 'Knowledge Base', 'wp-aichat' ); ?></h2>
 			<button class="aichat-button aichat-button-secondary" id="aichat-refresh-knowledge"><?php esc_html_e( 'Refresh', 'wp-aichat' ); ?></button>

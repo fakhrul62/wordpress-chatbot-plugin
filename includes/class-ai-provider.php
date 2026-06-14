@@ -12,32 +12,26 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WP_AICHAT_AI_Provider {
 	public static function generate_from_settings( array $settings, string $prompt, array $contents, string $knowledge = '' ) {
 		$message = self::latest_user_message( $contents );
-		if ( self::is_contact_question( $message ) ) {
-			return self::contact_answer( $knowledge );
-		}
-		if ( self::is_price_question( $message ) ) {
-			return self::price_answer( $knowledge );
-		}
-		if ( self::is_services_question( $message ) ) {
-			return self::services_answer( $knowledge );
-		}
 
 		if ( ! empty( $settings['openai_api_key'] ) ) {
 			$reliable = self::generate_openai( $settings, $prompt, $contents );
 			if ( ! is_wp_error( $reliable ) ) {
 				return $reliable;
 			}
+			self::record_failure( 'openai', $reliable, $settings );
 		}
 
 		$primary = self::generate_pollinations( $settings, $prompt, $contents );
 		if ( ! is_wp_error( $primary ) ) {
 			return $primary;
 		}
+		self::record_failure( 'pollinations', $primary, $settings );
 
 		$fallback = self::generate_ovh( $prompt, $contents );
 		if ( ! is_wp_error( $fallback ) ) {
 			return $fallback;
 		}
+		self::record_failure( 'ovh', $fallback, $settings );
 
 		return self::knowledge_fallback( $message, $knowledge );
 	}
@@ -61,6 +55,22 @@ class WP_AICHAT_AI_Provider {
 		return is_wp_error( $result ) ? $result : __( 'OpenAI connection successful. If it fails during chat, the free fallback will still be used.', 'wp-aichat' );
 	}
 
+	public static function test_fallbacks( array $settings ): string {
+		$prompt = 'You are a test assistant. Reply with OK only.';
+		$contents = array(
+			array(
+				'role'  => 'user',
+				'parts' => array( array( 'text' => 'Reply with OK.' ) ),
+			),
+		);
+		$results = array();
+		$pollinations = self::generate_pollinations( $settings, $prompt, $contents, true );
+		$results[] = is_wp_error( $pollinations ) ? 'Pollinations: ' . $pollinations->get_error_message() : 'Pollinations: OK';
+		$ovh = self::generate_ovh( $prompt, $contents, true );
+		$results[] = is_wp_error( $ovh ) ? 'OVH: ' . $ovh->get_error_message() : 'OVH: OK';
+		return implode( "\n", $results );
+	}
+
 	private static function generate_openai( array $settings, string $prompt, array $contents ) {
 		$api_key = trim( (string) ( $settings['openai_api_key'] ?? '' ) );
 		if ( '' === $api_key ) {
@@ -79,7 +89,7 @@ class WP_AICHAT_AI_Provider {
 		$response = wp_remote_post(
 			'https://api.openai.com/v1/chat/completions',
 			array(
-				'timeout' => 45,
+				'timeout' => 15,
 				'headers' => array(
 					'Authorization' => 'Bearer ' . $api_key,
 					'Content-Type'  => 'application/json',
@@ -111,7 +121,10 @@ class WP_AICHAT_AI_Provider {
 		return '' !== $text ? $text : new WP_Error( 'aichat_openai_empty', __( 'OpenAI returned an empty response.', 'wp-aichat' ) );
 	}
 
-	private static function generate_pollinations( array $settings, string $prompt, array $contents ) {
+	private static function generate_pollinations( array $settings, string $prompt, array $contents, bool $force = false ) {
+		if ( ! $force && self::provider_blocked( 'pollinations' ) ) {
+			return new WP_Error( 'aichat_provider_blocked', __( 'Pollinations is temporarily skipped after repeated failures.', 'wp-aichat' ) );
+		}
 		$model    = ! empty( $settings['ai_model'] ) ? $settings['ai_model'] : 'openai-fast';
 		$messages = array( array( 'role' => 'system', 'content' => $prompt ) );
 
@@ -126,7 +139,7 @@ class WP_AICHAT_AI_Provider {
 		$response = wp_remote_post(
 			'https://text.pollinations.ai/openai',
 			array(
-				'timeout' => 45,
+				'timeout' => 15,
 				'headers' => array( 'Content-Type' => 'application/json' ),
 				'body'    => wp_json_encode(
 					array(
@@ -157,7 +170,10 @@ class WP_AICHAT_AI_Provider {
 		return '' !== $text ? $text : new WP_Error( 'aichat_online_ai_empty', __( 'The online AI service returned an empty response.', 'wp-aichat' ) );
 	}
 
-	private static function generate_ovh( string $prompt, array $contents ) {
+	private static function generate_ovh( string $prompt, array $contents, bool $force = false ) {
+		if ( ! $force && self::provider_blocked( 'ovh' ) ) {
+			return new WP_Error( 'aichat_provider_blocked', __( 'OVH fallback is temporarily skipped after repeated failures.', 'wp-aichat' ) );
+		}
 		$messages = array( array( 'role' => 'system', 'content' => $prompt ) );
 		foreach ( $contents as $content ) {
 			$role = isset( $content['role'] ) && 'model' === $content['role'] ? 'assistant' : 'user';
@@ -170,7 +186,7 @@ class WP_AICHAT_AI_Provider {
 		$response = wp_remote_post(
 			'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions',
 			array(
-				'timeout' => 45,
+				'timeout' => 15,
 				'headers' => array( 'Content-Type' => 'application/json' ),
 				'body'    => wp_json_encode(
 					array(
@@ -323,51 +339,25 @@ class WP_AICHAT_AI_Provider {
 	}
 
 	private static function extract_service_names( string $text ): array {
-		$known = array(
-			'Plumbing Repairs',
-			'Gas Line Repairs',
-			'Tubs & Showers',
-			'Tubs and Showers',
-			'Clogged Drains',
-			'Drain Cleaning',
-			'Leak Repair',
-			'Pipe Repair',
-			'Pipe Installation',
-			'Water Heater Repair',
-			'Water Heater Installation',
-			'Bathroom Plumbing',
-			'Kitchen Plumbing',
-			'Toilet Repair',
-			'Faucet Repair',
-			'Sewer Line Repair',
-			'Emergency Plumbing',
+		$section = self::extract_between_labels(
+			$text,
+			array( 'Our Popular Services', 'Popular Services', 'Our Services', 'Services', 'Products', 'Courses', 'Programs', 'Offerings' ),
+			array( 'Projects', 'Portfolio', 'Testimonials', 'Reviews', 'Contact', 'Address', 'Hours', 'About', 'Blog', 'News' )
 		);
-		$found = array();
-		foreach ( $known as $name ) {
-			if ( false !== stripos( $text, $name ) ) {
-				$found[] = str_replace( ' and ', ' & ', $name );
-			}
-		}
-
-		if ( ! empty( $found ) ) {
-			return array_values( array_unique( $found ) );
-		}
-
-		$section = self::extract_between_labels( $text, array( 'Our Popular Services', 'Our Services', 'Services' ), array( 'Projects', 'Previews', 'Testimonials', 'Reviews', 'Contact', 'Address', 'Hours' ) );
 		if ( '' === $section ) {
 			return array();
 		}
 
-		preg_match_all( '/\b([A-Z][A-Za-z& ]{3,40})(?=(?:[A-Z][a-z]|Blocked|Repair|Installation|Cleaning|Service|$))/', $section, $matches );
+		$section = preg_replace( '/\b(?:View all|Learn more|Read more|Claim offer|Request estimate|Contact us)\b/i', '. ', (string) $section );
+		preg_match_all( '/(?:^|[.;:])\s*([A-Z][A-Za-z0-9&+\-\/ ]{3,60})(?=(?:[.;:]|$))/', $section, $matches );
 		$candidates = array_map( 'trim', $matches[1] ?? array() );
-		$blocked = array( 'Our Services', 'We provide many plumbing', 'View all services', 'Dhaka Plumbing' );
 		$services = array();
 		foreach ( $candidates as $candidate ) {
 			$candidate = trim( preg_replace( '/\s+/', ' ', $candidate ) );
-			if ( strlen( $candidate ) < 4 || in_array( $candidate, $blocked, true ) ) {
+			if ( strlen( $candidate ) < 4 || str_word_count( $candidate ) > 8 ) {
 				continue;
 			}
-			if ( preg_match( '/testimonial|project|customer|dhaka|provide|explained|cleared/i', $candidate ) ) {
+			if ( preg_match( '/testimonial|project|customer|review|address|hours|contact|welcome|home|about/i', $candidate ) ) {
 				continue;
 			}
 			$services[] = $candidate;
@@ -538,7 +528,6 @@ class WP_AICHAT_AI_Provider {
 	}
 
 	private static function knowledge_sentences( string $knowledge ): array {
-		$knowledge = preg_replace( '/\s+(?=[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}(?:Repair|Repairs|Cleaning|Installation|Course|Courses|Class|Program|Product|Menu|Service|Services)\b)/', '. ', $knowledge );
 		return preg_split( '/(?<=[.!?])\s+/', (string) $knowledge ) ?: array();
 	}
 
@@ -564,5 +553,22 @@ class WP_AICHAT_AI_Provider {
 
 	private static function not_found_answer(): string {
 		return __( 'I could not find a clear answer in the site knowledge base. Please check the relevant page or contact the site directly for the most accurate information.', 'wp-aichat' );
+	}
+
+	private static function provider_blocked( string $provider ): bool {
+		return (bool) get_transient( 'wp_aichat_provider_blocked_' . sanitize_key( $provider ) );
+	}
+
+	private static function record_failure( string $provider, WP_Error $error, array $settings ): void {
+		$key = 'wp_aichat_provider_failures_' . sanitize_key( $provider );
+		$count = (int) get_transient( $key ) + 1;
+		set_transient( $key, $count, 10 * MINUTE_IN_SECONDS );
+		if ( $count >= 3 ) {
+			set_transient( 'wp_aichat_provider_blocked_' . sanitize_key( $provider ), 1, 5 * MINUTE_IN_SECONDS );
+			delete_transient( $key );
+		}
+		if ( ! empty( $settings['provider_logging'] ) ) {
+			error_log( sprintf( 'WP AI Chat provider failure [%s]: %s', sanitize_key( $provider ), $error->get_error_message() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
 	}
 }

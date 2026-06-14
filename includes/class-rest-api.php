@@ -13,12 +13,15 @@ class WP_AICHAT_REST_API {
 	public static function register_routes(): void {
 		register_rest_route( 'wp-aichat/v1', '/crawl/start', array( 'methods' => 'POST', 'callback' => array( 'WP_AICHAT_Crawler', 'stream_crawl' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/knowledge', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'get_knowledge' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
+		register_rest_route( 'wp-aichat/v1', '/knowledge', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'add_knowledge' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/knowledge/(?P<id>\d+)', array( 'methods' => 'PUT', 'callback' => array( __CLASS__, 'update_knowledge' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/knowledge/(?P<id>\d+)', array( 'methods' => 'DELETE', 'callback' => array( __CLASS__, 'delete_knowledge' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/knowledge/(?P<id>\d+)/resync', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'resync_knowledge' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/settings', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'get_settings' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/settings', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'save_settings' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/test-connection', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'test_connection' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
+		register_rest_route( 'wp-aichat/v1', '/test-fallbacks', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'test_fallbacks' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
+		// Public by design: this endpoint accepts text only, never accepts URLs or provider endpoints, rate-limits by IP, and sends requests only to fixed provider URLs.
 		register_rest_route( 'wp-aichat/v1', '/chat', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'chat' ), 'permission_callback' => '__return_true' ) );
 	}
 
@@ -29,6 +32,15 @@ class WP_AICHAT_REST_API {
 
 	public static function get_knowledge( WP_REST_Request $request ): WP_REST_Response {
 		return rest_ensure_response( WP_AICHAT_Knowledge::list( max( 1, absint( $request['page'] ?: 1 ) ), min( 100, max( 1, absint( $request['per_page'] ?: 20 ) ) ) ) );
+	}
+
+	public static function add_knowledge( WP_REST_Request $request ) {
+		$title   = sanitize_text_field( (string) $request->get_param( 'title' ) );
+		$content = wp_kses_post( (string) $request->get_param( 'content' ) );
+		if ( ! WP_AICHAT_Knowledge::add_custom( $title, $content ) ) {
+			return new WP_Error( 'create_failed', __( 'Could not add knowledge item.', 'wp-aichat' ), array( 'status' => 400 ) );
+		}
+		return rest_ensure_response( array( 'success' => true ) );
 	}
 
 	public static function update_knowledge( WP_REST_Request $request ) {
@@ -60,7 +72,7 @@ class WP_AICHAT_REST_API {
 	}
 
 	public static function get_settings(): WP_REST_Response {
-		$settings = WP_AICHAT_Settings::get();
+		$settings = WP_AICHAT_Settings::get_for_admin();
 		$settings['system_prompt_preview'] = WP_AICHAT_Prompt_Builder::preview( $settings );
 		return rest_ensure_response( $settings );
 	}
@@ -68,8 +80,9 @@ class WP_AICHAT_REST_API {
 	public static function save_settings( WP_REST_Request $request ): WP_REST_Response {
 		$payload  = json_decode( $request->get_body(), true );
 		$settings = WP_AICHAT_Settings::save( is_array( $payload ) ? $payload : array() );
-		$settings['system_prompt_preview'] = WP_AICHAT_Prompt_Builder::preview( $settings );
-		return rest_ensure_response( array( 'success' => true, 'settings' => $settings ) );
+		$safe_settings = WP_AICHAT_Settings::response_safe( $settings );
+		$safe_settings['system_prompt_preview'] = WP_AICHAT_Prompt_Builder::preview( $settings );
+		return rest_ensure_response( array( 'success' => true, 'settings' => $safe_settings ) );
 	}
 
 	public static function test_connection( WP_REST_Request $request ) {
@@ -88,6 +101,14 @@ class WP_AICHAT_REST_API {
 				'message' => $result,
 			)
 		);
+	}
+
+	public static function test_fallbacks( WP_REST_Request $request ) {
+		$payload  = json_decode( $request->get_body(), true );
+		$current  = WP_AICHAT_Settings::get();
+		$settings = is_array( $payload ) ? WP_AICHAT_Settings::sanitize( array_merge( $current, $payload ) ) : $current;
+		$result   = WP_AICHAT_AI_Provider::test_fallbacks( $settings );
+		return rest_ensure_response( array( 'success' => true, 'message' => $result ) );
 	}
 
 	public static function chat( WP_REST_Request $request ) {
@@ -154,7 +175,7 @@ class WP_AICHAT_REST_API {
 	}
 
 	private static function rate_limited() {
-		$ip   = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : 'unknown';
+		$ip   = self::request_ip();
 		$key  = 'wp_aichat_rl_' . md5( $ip );
 		$hits = (int) get_transient( $key );
 		if ( $hits >= 20 ) {
@@ -162,5 +183,25 @@ class WP_AICHAT_REST_API {
 		}
 		set_transient( $key, $hits + 1, MINUTE_IN_SECONDS );
 		return true;
+	}
+
+	private static function request_ip(): string {
+		$candidates = array();
+		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
+			$candidates[] = sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+		}
+		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+			$forwarded = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
+			$candidates[] = trim( (string) $forwarded[0] );
+		}
+		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
+			$candidates[] = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+		}
+		foreach ( $candidates as $candidate ) {
+			if ( filter_var( $candidate, FILTER_VALIDATE_IP ) ) {
+				return $candidate;
+			}
+		}
+		return 'unknown';
 	}
 }

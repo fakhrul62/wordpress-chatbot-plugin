@@ -30,10 +30,42 @@ class WP_AICHAT_Knowledge {
 		);
 
 		if ( $existing ) {
-			return false !== $wpdb->update( $table, $data, array( 'id' => absint( $existing ) ), array( '%s', '%d', '%s', '%s', '%d', '%s' ), array( '%d' ) );
+			$updated = false !== $wpdb->update( $table, $data, array( 'id' => absint( $existing ) ), array( '%s', '%d', '%s', '%s', '%d', '%s' ), array( '%d' ) );
+			if ( $updated ) {
+				self::flush_cache();
+			}
+			return $updated;
 		}
 
-		return false !== $wpdb->insert( $table, $data, array( '%s', '%d', '%s', '%s', '%d', '%s' ) );
+		$inserted = false !== $wpdb->insert( $table, $data, array( '%s', '%d', '%s', '%s', '%d', '%s' ) );
+		if ( $inserted ) {
+			self::flush_cache();
+		}
+		return $inserted;
+	}
+
+	public static function add_custom( string $title, string $content ): bool {
+		global $wpdb;
+		$content = self::clean_content( $content );
+		if ( '' === trim( $title ) || '' === $content ) {
+			return false;
+		}
+		$inserted = false !== $wpdb->insert(
+			self::table(),
+			array(
+				'type'        => 'custom',
+				'object_id'   => 0,
+				'title'       => sanitize_text_field( $title ),
+				'content'     => $content,
+				'is_stale'    => 0,
+				'last_synced' => current_time( 'mysql' ),
+			),
+			array( '%s', '%d', '%s', '%s', '%d', '%s' )
+		);
+		if ( $inserted ) {
+			self::flush_cache();
+		}
+		return $inserted;
 	}
 
 	public static function list( int $page = 1, int $per_page = 20 ): array {
@@ -45,6 +77,7 @@ class WP_AICHAT_Knowledge {
 		return array(
 			'items'       => array_map( array( __CLASS__, 'format_item' ), $items ?: array() ),
 			'total'       => $total,
+			'warning'     => $total > 500 ? __( 'The knowledge base has more than 500 rows. Keyword matching may become slower; consider pruning old entries.', 'wp-aichat' ) : '',
 			'total_pages' => (int) ceil( $total / $per_page ),
 			'page'        => $page,
 			'per_page'    => $per_page,
@@ -61,7 +94,7 @@ class WP_AICHAT_Knowledge {
 	public static function update_content( int $id, string $content ): bool {
 		global $wpdb;
 		$content = self::clean_content( $content );
-		return false !== $wpdb->update(
+		$updated = false !== $wpdb->update(
 			self::table(),
 			array(
 				'content'     => $content,
@@ -72,29 +105,44 @@ class WP_AICHAT_Knowledge {
 			array( '%s', '%d', '%s' ),
 			array( '%d' )
 		);
+		if ( $updated ) {
+			self::flush_cache();
+		}
+		return $updated;
 	}
 
 	public static function delete( int $id ): bool {
 		global $wpdb;
-		return false !== $wpdb->delete( self::table(), array( 'id' => $id ), array( '%d' ) );
+		$deleted = false !== $wpdb->delete( self::table(), array( 'id' => $id ), array( '%d' ) );
+		if ( $deleted ) {
+			self::flush_cache();
+		}
+		return $deleted;
 	}
 
 	public static function mark_stale( int $object_id ): void {
 		global $wpdb;
 		$wpdb->update( self::table(), array( 'is_stale' => 1 ), array( 'object_id' => $object_id ), array( '%d' ), array( '%d' ) );
+		self::flush_cache();
 	}
 
 	public static function all_content(): array {
+		$cached = get_transient( 'wp_aichat_all_content' );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
 		global $wpdb;
 		$table = self::table();
 		$rows  = $wpdb->get_results( "SELECT title, content FROM {$table} WHERE is_stale = 0 ORDER BY last_synced DESC", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		return array_map(
+		$clean_rows = array_map(
 			static function ( array $row ): array {
 				$row['content'] = self::clean_content( (string) $row['content'] );
 				return $row;
 			},
 			$rows ?: array()
 		);
+		set_transient( 'wp_aichat_all_content', $clean_rows, HOUR_IN_SECONDS );
+		return $clean_rows;
 	}
 
 	public static function best_chunks( string $query, int $limit = 5 ): array {
@@ -146,5 +194,9 @@ class WP_AICHAT_Knowledge {
 		$content = html_entity_decode( $content, ENT_QUOTES, get_option( 'blog_charset', 'UTF-8' ) );
 		$content = preg_replace( '/\s+/', ' ', (string) $content );
 		return trim( (string) $content );
+	}
+
+	private static function flush_cache(): void {
+		delete_transient( 'wp_aichat_all_content' );
 	}
 }

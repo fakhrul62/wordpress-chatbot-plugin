@@ -138,6 +138,18 @@
 				setStatus(status, error.message, 'error');
 			});
 		});
+		var fallbackTest = document.getElementById('aichat-test-fallbacks');
+		if (fallbackTest) {
+			fallbackTest.addEventListener('click', function () {
+				var status = document.getElementById('aichat-test-status');
+				setStatus(status, 'Testing fallback providers...', '');
+				api('/test-fallbacks', { method: 'POST', body: JSON.stringify(formToSettings(form)) }).then(function (json) {
+					setStatus(status, json.message || 'Fallback test complete.', 'success');
+				}).catch(function (error) {
+					setStatus(status, error.message, 'error');
+				});
+			});
+		}
 		form.addEventListener('submit', function (event) {
 			event.preventDefault();
 			var next = formToSettings(form);
@@ -168,7 +180,7 @@
 				var rows = json.items.map(function (item) {
 					return '<tr data-id="' + item.id + '"><td>' + badge(escapeHtml(item.type), 'green') + '</td><td>' + escapeHtml(item.title) + '</td><td>' + escapeHtml(item.last_synced) + '</td><td>' + (item.is_stale ? badge('Stale', 'yellow') : badge('Synced', 'green')) + '</td><td class="aichat-actions"><button class="aichat-link-button" data-edit>Edit</button>' + (item.is_stale ? '<button class="aichat-link-button" data-resync>Re-sync</button>' : '') + '<button class="aichat-link-button" data-delete>Delete</button></td></tr><tr class="aichat-edit-row" data-edit-row="' + item.id + '" hidden><td colspan="5"><textarea>' + escapeHtml(item.content) + '</textarea><div class="aichat-actions"><button class="aichat-button aichat-button-primary" data-save>Edit Save</button><button class="aichat-button aichat-button-secondary" data-cancel>Cancel</button></div></td></tr>';
 				}).join('');
-				table.innerHTML = '<table class="aichat-table"><thead><tr><th>Type</th><th>Title</th><th>Last Synced</th><th>Status</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table><div class="aichat-pagination"><button class="aichat-button aichat-button-secondary" data-prev>Previous</button><span>Page ' + json.page + ' of ' + Math.max(1, json.total_pages) + '</span><button class="aichat-button aichat-button-secondary" data-next>Next</button></div>';
+				table.innerHTML = (json.warning ? '<div class="aichat-inline-status is-error">' + escapeHtml(json.warning) + '</div>' : '') + '<table class="aichat-table"><thead><tr><th>Type</th><th>Title</th><th>Last Synced</th><th>Status</th><th>Actions</th></tr></thead><tbody>' + rows + '</tbody></table><div class="aichat-pagination"><button class="aichat-button aichat-button-secondary" data-prev>Previous</button><span>Page ' + json.page + ' of ' + Math.max(1, json.total_pages) + '</span><button class="aichat-button aichat-button-secondary" data-next>Next</button></div>';
 				table.querySelector('[data-prev]').disabled = page <= 1;
 				table.querySelector('[data-next]').disabled = page >= json.total_pages;
 			});
@@ -190,6 +202,21 @@
 			if (btn.hasAttribute('data-resync') && id) api('/knowledge/' + id + '/resync', { method: 'POST' }).then(load);
 		});
 		document.getElementById('aichat-refresh-knowledge').addEventListener('click', load);
+		var customForm = document.getElementById('aichat-custom-knowledge-form');
+		if (customForm) {
+			customForm.addEventListener('submit', function (event) {
+				event.preventDefault();
+				var status = document.getElementById('aichat-custom-knowledge-status');
+				setStatus(status, 'Adding knowledge...', '');
+				api('/knowledge', { method: 'POST', body: JSON.stringify(formToSettings(customForm)) }).then(function () {
+					customForm.reset();
+					setStatus(status, 'Knowledge added.', 'success');
+					load();
+				}).catch(function (error) {
+					setStatus(status, error.message, 'error');
+				});
+			});
+		}
 		load();
 		initCrawl(load);
 	}
@@ -229,7 +256,7 @@
 								log.scrollTop = log.scrollHeight;
 							}
 							if (item.status === 'complete') {
-								setStatus(status, 'Crawl complete. ' + item.count + ' items indexed.', 'success');
+								setStatus(status, 'Crawl complete. ' + item.count + ' items indexed, ' + (item.skipped || 0) + ' skipped.', 'success');
 								afterDone();
 							}
 						});

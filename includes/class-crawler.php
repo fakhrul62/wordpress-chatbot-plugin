@@ -35,7 +35,6 @@ class WP_AICHAT_Crawler {
 		$content = str_replace( array( "\r", "\n", "\t", '&nbsp;' ), ' ', $content );
 		$content = preg_replace( '/\s+/', ' ', (string) $content );
 		$content = preg_replace( '/(\+?\d[\d\s().-]{7,}\d)([A-Z0-9._%+\-]+@[A-Z0-9.\-]+\.[A-Z]{2,})/i', '$1 $2', (string) $content );
-		$content = preg_replace( '/\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})(?=(?:[A-Z][a-z]{2,}|Blocked|Repair|Repairs|Installation|Cleaning|Services?|Courses?|Classes?|Programs?|Products?)\b)/', '$1. ', (string) $content );
 		$content = preg_replace( '/(\d)\s*-\s*([AP]M)\b/i', '$1 $2', (string) $content );
 		$content = preg_replace( '/\bto(?=\d)/i', 'to ', (string) $content );
 		$content = preg_replace( '/\b(\d{1,2})\s*([AP]M)\s*to\s*(\d{1,2})\s*([AP]M)\b/i', '$1 $2 to $3 $4', (string) $content );
@@ -117,16 +116,23 @@ class WP_AICHAT_Crawler {
 		$posts = self::posts();
 		$total = count( $posts );
 		$count = 0;
+		$indexed = 0;
+		$skipped = 0;
 		self::send_event( array( 'status' => 'started', 'total' => $total, 'progress' => 0 ) );
 
 		foreach ( $posts as $post ) {
 			$count++;
 			$result             = self::crawl_post( $post );
+			if ( 'extracted' === $result['status'] ) {
+				$indexed++;
+			} elseif ( 'skipped' === $result['status'] ) {
+				$skipped++;
+			}
 			$result['progress'] = $total > 0 ? (int) round( ( $count / $total ) * 100 ) : 100;
 			self::send_event( $result );
 		}
 
-		self::send_event( array( 'status' => 'complete', 'count' => $count, 'progress' => 100 ) );
+		self::send_event( array( 'status' => 'complete', 'count' => $indexed, 'skipped' => $skipped, 'total' => $total, 'progress' => 100 ) );
 		exit;
 	}
 

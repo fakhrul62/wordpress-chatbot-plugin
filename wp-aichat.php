@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP AI Chat
  * Description: Site-aware online AI chat widget with a WordPress knowledge base.
- * Version: 1.0.18
+ * Version: 1.0.19
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author: Fakhrul Alam
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WP_AICHAT_VERSION', '1.0.18' );
+define( 'WP_AICHAT_VERSION', '1.0.19' );
 define( 'WP_AICHAT_MIN_WP', '6.0' );
 define( 'WP_AICHAT_MIN_PHP', '8.0' );
 define( 'WP_AICHAT_FILE', __FILE__ );
@@ -43,6 +43,9 @@ add_action(
 	static function () {
 		load_plugin_textdomain( 'wp-aichat', false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 		WP_AICHAT_Settings::ensure_defaults();
+		if ( ! wp_next_scheduled( 'wp_aichat_cleanup_cache' ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'wp_aichat_cleanup_cache' );
+		}
 	}
 );
 
@@ -59,6 +62,7 @@ add_action( 'admin_enqueue_scripts', array( 'WP_AICHAT_Admin', 'enqueue_assets' 
 add_action( 'wp_enqueue_scripts', array( 'WP_AICHAT_Widget', 'register_assets' ) );
 add_action( 'wp_footer', array( 'WP_AICHAT_Widget', 'render_floating_widget' ) );
 add_action( 'save_post', array( 'WP_AICHAT_Crawler', 'mark_stale_on_save' ), 10, 3 );
+add_action( 'wp_aichat_cleanup_cache', array( 'WP_AICHAT_Cache', 'cleanup_expired' ) );
 
 add_filter(
 	'plugin_action_links_' . plugin_basename( __FILE__ ),

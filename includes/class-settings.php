@@ -16,6 +16,9 @@ class WP_AICHAT_Settings {
 			'ai_model'               => 'openai-fast',
 			'openai_model'           => 'gpt-4o-mini',
 			'openai_api_key'         => '',
+			'openai_api_key_encrypted' => '',
+			'openai_api_key_last4'   => '',
+			'provider_logging'       => false,
 			'language'               => 'English',
 			'tone'                   => 'friendly',
 			'whitelist'              => '',
@@ -61,9 +64,28 @@ class WP_AICHAT_Settings {
 		$raw      = get_option( WP_AICHAT_OPTION, '' );
 		$decoded  = is_string( $raw ) && '' !== $raw ? json_decode( $raw, true ) : array();
 		$settings = is_array( $decoded ) ? $decoded : array();
-		unset( $settings[ self::legacy_secret_key() ], $settings[ self::legacy_local_url_key() ] );
+		unset( $settings['api_key'], $settings['ollama_url'] );
+		$legacy_plain_key = ! empty( $settings['openai_api_key'] ) ? sanitize_text_field( (string) $settings['openai_api_key'] ) : '';
 		$settings = self::merge_defaults( $settings, self::defaults() );
 		$settings['ai_provider'] = 'pollinations';
+		$settings['openai_api_key'] = self::decrypt_api_key( (string) $settings['openai_api_key_encrypted'] );
+		if ( '' === $settings['openai_api_key'] && '' !== $legacy_plain_key ) {
+			$settings['openai_api_key'] = $legacy_plain_key;
+		}
+		return $settings;
+	}
+
+	public static function get_for_admin(): array {
+		$settings = self::get();
+		$settings['openai_api_key'] = '';
+		$settings['openai_api_key_masked'] = self::masked_api_key( (string) $settings['openai_api_key_last4'] );
+		unset( $settings['openai_api_key_encrypted'] );
+		return $settings;
+	}
+
+	public static function get_public_safe(): array {
+		$settings = self::get_for_admin();
+		unset( $settings['openai_api_key'], $settings['openai_api_key_masked'], $settings['openai_api_key_last4'] );
 		return $settings;
 	}
 
@@ -75,17 +97,32 @@ class WP_AICHAT_Settings {
 
 		$raw     = get_option( WP_AICHAT_OPTION, '' );
 		$decoded = is_string( $raw ) && '' !== $raw ? json_decode( $raw, true ) : array();
-		if ( is_array( $decoded ) && ( isset( $decoded[ self::legacy_secret_key() ] ) || isset( $decoded[ self::legacy_local_url_key() ] ) ) ) {
-			unset( $decoded[ self::legacy_secret_key() ], $decoded[ self::legacy_local_url_key() ] );
-			$decoded['ai_provider'] = 'pollinations';
-			$decoded['ai_model']    = ! empty( $decoded['ai_model'] ) ? sanitize_text_field( (string) $decoded['ai_model'] ) : 'openai-fast';
-			update_option( WP_AICHAT_OPTION, wp_json_encode( self::merge_defaults( $decoded, self::defaults() ) ), false );
+		if ( is_array( $decoded ) ) {
+			$changed = false;
+			if ( isset( $decoded['api_key'] ) || isset( $decoded['ollama_url'] ) ) {
+				unset( $decoded['api_key'], $decoded['ollama_url'] );
+				$changed = true;
+			}
+			if ( ! empty( $decoded['openai_api_key'] ) && empty( $decoded['openai_api_key_encrypted'] ) ) {
+				$plain = sanitize_text_field( (string) $decoded['openai_api_key'] );
+				$decoded['openai_api_key_encrypted'] = self::encrypt_api_key( $plain );
+				$decoded['openai_api_key_last4'] = substr( $plain, -4 );
+				$decoded['openai_api_key'] = '';
+				$changed = true;
+			}
+			if ( $changed ) {
+				$decoded['ai_provider'] = 'pollinations';
+				$decoded['ai_model']    = ! empty( $decoded['ai_model'] ) ? sanitize_text_field( (string) $decoded['ai_model'] ) : 'openai-fast';
+				update_option( WP_AICHAT_OPTION, wp_json_encode( self::merge_defaults( $decoded, self::defaults() ) ), false );
+			}
 		}
 	}
 
 	public static function save( array $settings ): array {
 		$clean = self::sanitize( $settings );
-		update_option( WP_AICHAT_OPTION, wp_json_encode( $clean ), false );
+		$stored = $clean;
+		$stored['openai_api_key'] = '';
+		update_option( WP_AICHAT_OPTION, wp_json_encode( $stored ), false );
 		return $clean;
 	}
 
@@ -93,11 +130,20 @@ class WP_AICHAT_Settings {
 		$current = self::get();
 		$merged  = self::merge_defaults( $input, $current );
 
-		unset( $merged[ self::legacy_secret_key() ], $merged[ self::legacy_local_url_key() ] );
+		unset( $merged['api_key'], $merged['ollama_url'], $merged['openai_api_key_masked'] );
 		$merged['ai_provider']            = 'pollinations';
 		$merged['ai_model']               = sanitize_text_field( (string) $merged['ai_model'] );
 		$merged['openai_model']           = sanitize_text_field( (string) $merged['openai_model'] );
-		$merged['openai_api_key']         = sanitize_text_field( (string) $merged['openai_api_key'] );
+		$new_api_key                      = isset( $input['openai_api_key'] ) ? trim( sanitize_text_field( (string) $input['openai_api_key'] ) ) : '';
+		if ( '' !== $new_api_key ) {
+			$merged['openai_api_key_encrypted'] = self::encrypt_api_key( $new_api_key );
+			$merged['openai_api_key_last4']     = substr( $new_api_key, -4 );
+		} else {
+			$current_api_key = (string) ( $current['openai_api_key'] ?? '' );
+			$merged['openai_api_key_encrypted'] = ! empty( $current['openai_api_key_encrypted'] ) ? (string) $current['openai_api_key_encrypted'] : self::encrypt_api_key( $current_api_key );
+			$merged['openai_api_key_last4']     = ! empty( $current['openai_api_key_last4'] ) ? (string) $current['openai_api_key_last4'] : ( '' !== $current_api_key ? substr( $current_api_key, -4 ) : '' );
+		}
+		$merged['openai_api_key'] = self::decrypt_api_key( (string) $merged['openai_api_key_encrypted'] );
 		$merged['language']               = sanitize_text_field( (string) $merged['language'] );
 		$merged['tone']                   = in_array( $merged['tone'], array( 'friendly', 'professional', 'formal', 'concise' ), true ) ? $merged['tone'] : 'friendly';
 		$merged['whitelist']              = sanitize_textarea_field( (string) $merged['whitelist'] );
@@ -106,6 +152,7 @@ class WP_AICHAT_Settings {
 		$merged['system_prompt_override'] = sanitize_textarea_field( (string) $merged['system_prompt_override'] );
 		$merged['cache_enabled']          = (bool) $merged['cache_enabled'];
 		$merged['cache_ttl_hours']        = max( 1, absint( $merged['cache_ttl_hours'] ) );
+		$merged['provider_logging']       = (bool) $merged['provider_logging'];
 		$merged['shop_url']               = esc_url_raw( (string) $merged['shop_url'] );
 		$merged['show_on_mode']           = 'specific' === $merged['show_on_mode'] ? 'specific' : 'all';
 		$merged['show_on_ids']            = array_values( array_filter( array_map( 'absint', (array) $merged['show_on_ids'] ) ) );
@@ -141,6 +188,13 @@ class WP_AICHAT_Settings {
 		return $merged;
 	}
 
+	public static function response_safe( array $settings ): array {
+		$settings['openai_api_key'] = '';
+		$settings['openai_api_key_masked'] = self::masked_api_key( (string) ( $settings['openai_api_key_last4'] ?? '' ) );
+		unset( $settings['openai_api_key_encrypted'] );
+		return $settings;
+	}
+
 	private static function clean_number_string( mixed $value ): string {
 		if ( '' === $value || null === $value ) {
 			return '';
@@ -148,12 +202,46 @@ class WP_AICHAT_Settings {
 		return (string) absint( $value );
 	}
 
-	private static function legacy_secret_key(): string {
-		return 'api' . '_key';
+	private static function encryption_key(): string {
+		return hash( 'sha256', wp_salt( 'auth' ) . wp_salt( 'secure_auth' ), true );
 	}
 
-	private static function legacy_local_url_key(): string {
-		return 'ol' . 'lama_url';
+	private static function encrypt_api_key( string $value ): string {
+		if ( '' === $value ) {
+			return '';
+		}
+		if ( function_exists( 'openssl_encrypt' ) ) {
+			$iv = random_bytes( 16 );
+			$ciphertext = openssl_encrypt( $value, 'aes-256-cbc', self::encryption_key(), OPENSSL_RAW_DATA, $iv );
+			if ( false !== $ciphertext ) {
+				return 'enc:' . base64_encode( $iv . $ciphertext );
+			}
+		}
+		return 'b64:' . base64_encode( $value );
+	}
+
+	private static function decrypt_api_key( string $value ): string {
+		if ( '' === $value ) {
+			return '';
+		}
+		if ( str_starts_with( $value, 'enc:' ) && function_exists( 'openssl_decrypt' ) ) {
+			$raw = base64_decode( substr( $value, 4 ), true );
+			if ( is_string( $raw ) && strlen( $raw ) > 16 ) {
+				$iv = substr( $raw, 0, 16 );
+				$ciphertext = substr( $raw, 16 );
+				$plain = openssl_decrypt( $ciphertext, 'aes-256-cbc', self::encryption_key(), OPENSSL_RAW_DATA, $iv );
+				return is_string( $plain ) ? $plain : '';
+			}
+		}
+		if ( str_starts_with( $value, 'b64:' ) ) {
+			$plain = base64_decode( substr( $value, 4 ), true );
+			return is_string( $plain ) ? $plain : '';
+		}
+		return $value;
+	}
+
+	private static function masked_api_key( string $last4 ): string {
+		return '' === $last4 ? '' : '********' . $last4;
 	}
 
 	private static function merge_defaults( array $settings, array $defaults ): array {

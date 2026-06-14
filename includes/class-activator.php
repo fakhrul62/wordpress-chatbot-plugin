@@ -61,5 +61,8 @@ class WP_AICHAT_Activator {
 		dbDelta( $sql_knowledge );
 		dbDelta( $sql_cache );
 		WP_AICHAT_Settings::ensure_defaults();
+		if ( ! wp_next_scheduled( 'wp_aichat_cleanup_cache' ) ) {
+			wp_schedule_event( time() + HOUR_IN_SECONDS, 'daily', 'wp_aichat_cleanup_cache' );
+		}
 	}
 }

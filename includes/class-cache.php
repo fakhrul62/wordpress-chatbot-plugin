@@ -41,4 +41,13 @@ class WP_AICHAT_Cache {
 		}
 		return false !== $wpdb->insert( $table, $data, array( '%s', '%s', '%s' ) );
 	}
+
+	public static function cleanup_expired(): void {
+		global $wpdb;
+		$settings = WP_AICHAT_Settings::get();
+		$ttl_hours = max( 1, absint( $settings['cache_ttl_hours'] ?? 24 ) );
+		$cutoff = gmdate( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( $ttl_hours * HOUR_IN_SECONDS ) );
+		$table = self::table();
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", $cutoff ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
 }

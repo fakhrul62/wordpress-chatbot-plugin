@@ -28,13 +28,14 @@ class WP_AICHAT_Admin {
 		wp_enqueue_style( 'wp-aichat-admin' );
 		wp_enqueue_script( 'wp-aichat-admin' );
 		wp_enqueue_media();
+		$settings = WP_AICHAT_Settings::get_for_admin();
 		wp_localize_script(
 			'wp-aichat-admin',
 			'WPAIChatAdmin',
 			array(
 				'restUrl'   => esc_url_raw( rest_url( 'wp-aichat/v1' ) ),
 				'nonce'     => wp_create_nonce( 'wp_rest' ),
-				'settings'  => WP_AICHAT_Settings::get(),
+				'settings'  => $settings,
 				'prompt'    => WP_AICHAT_Prompt_Builder::preview( WP_AICHAT_Settings::get() ),
 				'chatIcon'  => self::icon_chat(),
 				'xIcon'     => self::icon_x(),
