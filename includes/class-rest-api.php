@@ -12,6 +12,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WP_AICHAT_REST_API {
 	public static function register_routes(): void {
 		register_rest_route( 'wp-aichat/v1', '/crawl/start', array( 'methods' => 'POST', 'callback' => array( 'WP_AICHAT_Crawler', 'stream_crawl' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
+		register_rest_route( 'wp-aichat/v1', '/train/start', array( 'methods' => 'POST', 'callback' => array( 'WP_AICHAT_Trainer', 'stream_train' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/knowledge', array( 'methods' => 'GET', 'callback' => array( __CLASS__, 'get_knowledge' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/knowledge', array( 'methods' => 'POST', 'callback' => array( __CLASS__, 'add_knowledge' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
 		register_rest_route( 'wp-aichat/v1', '/knowledge/(?P<id>\d+)', array( 'methods' => 'PUT', 'callback' => array( __CLASS__, 'update_knowledge' ), 'permission_callback' => array( __CLASS__, 'can_manage' ) ) );
@@ -166,7 +167,17 @@ class WP_AICHAT_REST_API {
 	}
 
 	private static function knowledge_for_message( string $message ): string {
-		if ( WP_AICHAT_Knowledge::total_chars() < 32000 ) {
+		$settings = WP_AICHAT_Settings::get();
+		$semantic_chunks = array();
+		if ( ! empty( $settings['openai_api_key'] ) ) {
+			$query_vector = WP_AICHAT_AI_Provider::embedding_from_settings( $settings, $message );
+			if ( ! is_wp_error( $query_vector ) ) {
+				$semantic_chunks = WP_AICHAT_Knowledge::embedding_chunks_for_query( $query_vector, 5 );
+			}
+		}
+		if ( ! empty( $semantic_chunks ) ) {
+			$chunks = $semantic_chunks;
+		} elseif ( WP_AICHAT_Knowledge::total_chars() < 32000 ) {
 			$chunks = array_map( static fn( $row ) => trim( $row['title'] . "\n" . $row['content'] ), WP_AICHAT_Knowledge::all_content() );
 		} else {
 			$chunks = WP_AICHAT_Knowledge::best_chunks( $message, 5 );

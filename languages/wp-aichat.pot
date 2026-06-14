@@ -2,7 +2,7 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP AI Chat 1.0.21\n"
+"Project-Id-Version: WP AI Chat 1.0.22\n"
 "Report-Msgid-Bugs-To: https://github.com/fakhrul62/wordpress-chatbot-plugin\n"
 "POT-Creation-Date: 2026-06-14 00:00+0000\n"
 "MIME-Version: 1.0\n"
@@ -15,6 +15,51 @@ msgid "AI Chat"
 msgstr ""
 
 msgid "Knowledge Base"
+msgstr ""
+
+msgid "Train Site"
+msgstr ""
+
+msgid "Training creates a site summary and, when an OpenAI key is configured, semantic search embeddings."
+msgstr ""
+
+msgid "No knowledge content found. Run a crawl or add custom knowledge first."
+msgstr ""
+
+msgid "Training started."
+msgstr ""
+
+msgid "Creating site summary."
+msgstr ""
+
+msgid "Site summary saved to the knowledge base."
+msgstr ""
+
+msgid "Embeddings skipped because no OpenAI API key is configured."
+msgstr ""
+
+msgid "Training complete. Summary is now part of chat context."
+msgstr ""
+
+msgid "Creating semantic search embeddings."
+msgstr ""
+
+msgid "Embedded chunk %1$d of %2$d."
+msgstr ""
+
+msgid "Training complete. Summary and semantic search are ready."
+msgstr ""
+
+msgid "Could not generate a useful site summary. Check the AI provider connection and try again."
+msgstr ""
+
+msgid "OpenAI API key is required for embeddings."
+msgstr ""
+
+msgid "OpenAI embeddings request failed with HTTP %d."
+msgstr ""
+
+msgid "OpenAI returned an empty embedding."
 msgstr ""
 
 msgid "AI Configuration"

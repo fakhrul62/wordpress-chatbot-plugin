@@ -223,19 +223,22 @@
 
 	function initCrawl(afterDone) {
 		var button = document.getElementById('aichat-start-crawl');
-		if (!button) return;
+		var trainButton = document.getElementById('aichat-start-train');
+		if (!button && !trainButton) return;
 		var progress = document.querySelector('.aichat-progress');
 		var bar = progress.querySelector('span');
 		var log = document.getElementById('aichat-crawl-log');
 		var status = document.getElementById('aichat-crawl-status');
-		button.addEventListener('click', function () {
+		function runStream(trigger, endpoint, workingText, completeHandler) {
 			button.disabled = true;
+			if (trainButton) trainButton.disabled = true;
 			progress.hidden = false;
 			progress.classList.add('is-indeterminate');
+			bar.style.width = '0%';
 			log.hidden = false;
 			log.innerHTML = '';
-			setStatus(status, 'Crawling...', '');
-			fetch(restUrl('/crawl/start', { _wpnonce: window.WPAIChatAdmin.nonce }), { method: 'POST', headers: { 'X-WP-Nonce': window.WPAIChatAdmin.nonce } }).then(function (response) {
+			setStatus(status, workingText, '');
+			fetch(restUrl(endpoint, { _wpnonce: window.WPAIChatAdmin.nonce }), { method: 'POST', headers: { 'X-WP-Nonce': window.WPAIChatAdmin.nonce } }).then(function (response) {
 				var reader = response.body.getReader();
 				var decoder = new TextDecoder();
 				var buffer = '';
@@ -254,10 +257,12 @@
 							if (item.title) {
 								log.insertAdjacentHTML('beforeend', '<div class="aichat-log-line">' + icon() + '<span>' + escapeHtml(item.type) + ': ' + escapeHtml(item.title) + '</span>' + '<span class="aichat-badge aichat-badge-' + (item.status === 'error' ? 'red' : item.status === 'skipped' ? 'yellow' : 'green') + '">' + escapeHtml(item.status) + '</span></div>');
 								log.scrollTop = log.scrollHeight;
+							} else if (item.message) {
+								log.insertAdjacentHTML('beforeend', '<div class="aichat-log-line">' + icon() + '<span>' + escapeHtml(item.message) + '</span>' + '<span class="aichat-badge aichat-badge-' + (item.status === 'error' || item.status === 'embedding_error' ? 'red' : item.status === 'embeddings_skipped' ? 'yellow' : 'green') + '">' + escapeHtml(item.status) + '</span></div>');
+								log.scrollTop = log.scrollHeight;
 							}
 							if (item.status === 'complete') {
-								setStatus(status, 'Crawl complete. ' + item.count + ' items indexed, ' + (item.skipped || 0) + ' skipped.', 'success');
-								afterDone();
+								completeHandler(item);
 							}
 						});
 						buffer = buffer.split('\n\n').pop();
@@ -269,8 +274,25 @@
 				setStatus(status, error.message, 'error');
 			}).finally(function () {
 				button.disabled = false;
+				if (trainButton) trainButton.disabled = false;
 			});
-		});
+		}
+		if (button) {
+			button.addEventListener('click', function () {
+				runStream(button, '/crawl/start', 'Crawling...', function (item) {
+					setStatus(status, 'Crawl complete. ' + item.count + ' items indexed, ' + (item.skipped || 0) + ' skipped.', 'success');
+					afterDone();
+				});
+			});
+		}
+		if (trainButton) {
+			trainButton.addEventListener('click', function () {
+				runStream(trainButton, '/train/start', 'Training site...', function (item) {
+					setStatus(status, 'Training complete. Summary saved. ' + (item.embeddings || 0) + ' semantic chunks indexed.', 'success');
+					afterDone();
+				});
+			});
+		}
 	}
 
 	function previewSettings(form) {

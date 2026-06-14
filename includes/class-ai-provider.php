@@ -77,6 +77,43 @@ class WP_AICHAT_AI_Provider {
 		return implode( "\n", $results );
 	}
 
+	public static function embedding_from_settings( array $settings, string $text ) {
+		$api_key = trim( (string) ( $settings['openai_api_key'] ?? '' ) );
+		if ( '' === $api_key ) {
+			return new WP_Error( 'aichat_embedding_missing_key', __( 'OpenAI API key is required for embeddings.', 'wp-aichat' ) );
+		}
+		$response = wp_remote_post(
+			'https://api.openai.com/v1/embeddings',
+			array(
+				'timeout' => 20,
+				'headers' => array(
+					'Authorization' => 'Bearer ' . $api_key,
+					'Content-Type'  => 'application/json',
+				),
+				'body'    => wp_json_encode(
+					array(
+						'model' => 'text-embedding-3-small',
+						'input' => self::limit_text( $text, 8000 ),
+					)
+				),
+			)
+		);
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+		$code = (int) wp_remote_retrieve_response_code( $response );
+		$json = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( 200 !== $code ) {
+			$message = isset( $json['error']['message'] ) ? sanitize_text_field( $json['error']['message'] ) : sprintf( __( 'OpenAI embeddings request failed with HTTP %d.', 'wp-aichat' ), $code );
+			return new WP_Error( 'aichat_embedding_error', $message );
+		}
+		$vector = $json['data'][0]['embedding'] ?? array();
+		if ( ! is_array( $vector ) || empty( $vector ) ) {
+			return new WP_Error( 'aichat_embedding_empty', __( 'OpenAI returned an empty embedding.', 'wp-aichat' ) );
+		}
+		return array_values( array_map( 'floatval', $vector ) );
+	}
+
 	private static function generate_openai( array $settings, string $prompt, array $contents ) {
 		$api_key = trim( (string) ( $settings['openai_api_key'] ?? '' ) );
 		if ( '' === $api_key ) {
@@ -343,6 +380,10 @@ class WP_AICHAT_AI_Provider {
 			$answer = substr( $answer, 0, 1197 ) . '...';
 		}
 		return trim( (string) $answer );
+	}
+
+	private static function limit_text( string $text, int $limit ): string {
+		return function_exists( 'mb_substr' ) ? mb_substr( $text, 0, $limit ) : substr( $text, 0, $limit );
 	}
 
 	private static function contact_answer( string $knowledge ): string {

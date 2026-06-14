@@ -10,6 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) { exit; }
 		<h2><?php esc_html_e( 'Crawl Site', 'wp-aichat' ); ?></h2>
 		<p><?php esc_html_e( "Scan your site's pages and posts to build the knowledge base.", 'wp-aichat' ); ?></p>
 		<button class="aichat-button aichat-button-primary" id="aichat-start-crawl"><?php esc_html_e( 'Crawl Site', 'wp-aichat' ); ?></button>
+		<button class="aichat-button aichat-button-secondary" id="aichat-start-train"><?php esc_html_e( 'Train Site', 'wp-aichat' ); ?></button>
+		<p class="aichat-note"><?php esc_html_e( 'Training creates a site summary and, when an OpenAI key is configured, semantic search embeddings.', 'wp-aichat' ); ?></p>
 		<div class="aichat-progress" hidden><span></span></div>
 		<div class="aichat-log" id="aichat-crawl-log" hidden></div>
 		<div class="aichat-inline-status" id="aichat-crawl-status"></div>

@@ -13,7 +13,9 @@ global $wpdb;
 
 $knowledge_table = $wpdb->prefix . 'aichat_knowledge';
 $cache_table     = $wpdb->prefix . 'aichat_cache';
+$embeddings_table = $wpdb->prefix . 'aichat_embeddings';
 
 $wpdb->query( 'DROP TABLE IF EXISTS ' . esc_sql( $knowledge_table ) );
 $wpdb->query( 'DROP TABLE IF EXISTS ' . esc_sql( $cache_table ) );
+$wpdb->query( 'DROP TABLE IF EXISTS ' . esc_sql( $embeddings_table ) );
 $wpdb->query( $wpdb->prepare( 'DELETE FROM ' . $wpdb->options . ' WHERE option_name = %s', 'wp_aichat_settings' ) ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared

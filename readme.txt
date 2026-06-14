@@ -4,7 +4,7 @@ Tags: ai, chatbot, chat, knowledge base, support
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.0
-Stable tag: 1.0.21
+Stable tag: 1.0.22
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,6 +18,8 @@ Features:
 
 * Crawl pages and posts into a local knowledge base.
 * Add custom facts or Q&A entries manually.
+* Train a site summary from the knowledge base.
+* Optional OpenAI embeddings for semantic search.
 * Optional OpenAI API key with encrypted storage.
 * AI modes: Free only, OpenAI with free fallback, or OpenAI only.
 * Free online fallback providers when no API key is configured or the primary provider fails.
@@ -51,6 +53,11 @@ No. API keys are stored server-side, encrypted at rest where OpenSSL is availabl
 No. Product crawling is intentionally excluded.
 
 == Changelog ==
+
+= 1.0.22 =
+* Added Train Site workflow for AI-generated site summary.
+* Added OpenAI embedding generation and semantic search retrieval.
+* Added embeddings database table and streaming training progress.
 
 = 1.0.21 =
 * Improved fallback answer voice so local fallback speaks as the site instead of saying "Here is what I found."

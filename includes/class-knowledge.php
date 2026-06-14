@@ -15,6 +15,11 @@ class WP_AICHAT_Knowledge {
 		return $wpdb->prefix . 'aichat_knowledge';
 	}
 
+	public static function embeddings_table(): string {
+		global $wpdb;
+		return $wpdb->prefix . 'aichat_embeddings';
+	}
+
 	public static function upsert( string $type, int $object_id, string $title, string $content ): bool {
 		global $wpdb;
 		$table    = self::table();
@@ -66,6 +71,29 @@ class WP_AICHAT_Knowledge {
 			self::flush_cache();
 		}
 		return $inserted;
+	}
+
+	public static function upsert_summary( string $content ): int {
+		global $wpdb;
+		$table = self::table();
+		$content = self::clean_content( $content );
+		$existing = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE type = %s AND object_id = %d LIMIT 1", 'summary', 0 ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$data = array(
+			'type'        => 'summary',
+			'object_id'   => 0,
+			'title'       => __( 'Trained Site Summary', 'wp-aichat' ),
+			'content'     => $content,
+			'is_stale'    => 0,
+			'last_synced' => current_time( 'mysql' ),
+		);
+		if ( $existing ) {
+			$wpdb->update( $table, $data, array( 'id' => absint( $existing ) ), array( '%s', '%d', '%s', '%s', '%d', '%s' ), array( '%d' ) );
+			self::flush_cache();
+			return absint( $existing );
+		}
+		$wpdb->insert( $table, $data, array( '%s', '%d', '%s', '%s', '%d', '%s' ) );
+		self::flush_cache();
+		return absint( $wpdb->insert_id );
 	}
 
 	public static function list( int $page = 1, int $per_page = 20 ): array {
@@ -167,6 +195,66 @@ class WP_AICHAT_Knowledge {
 		);
 	}
 
+	public static function embedding_chunks_for_query( array $query_vector, int $limit = 5 ): array {
+		if ( empty( $query_vector ) ) {
+			return array();
+		}
+		global $wpdb;
+		$table = self::embeddings_table();
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT chunk_text, vector FROM {$table} WHERE dims = %d", count( $query_vector ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$scored = array();
+		foreach ( $rows ?: array() as $row ) {
+			$vector = json_decode( (string) $row['vector'], true );
+			if ( ! is_array( $vector ) ) {
+				continue;
+			}
+			$score = self::cosine_similarity( $query_vector, array_map( 'floatval', $vector ) );
+			if ( $score <= 0 ) {
+				continue;
+			}
+			$scored[] = array(
+				'text'  => (string) $row['chunk_text'],
+				'score' => $score,
+			);
+		}
+		usort( $scored, static fn( $a, $b ) => $b['score'] <=> $a['score'] );
+		return array_map( static fn( $row ) => $row['text'], array_slice( $scored, 0, $limit ) );
+	}
+
+	public static function replace_embeddings( array $items ): int {
+		global $wpdb;
+		$table = self::embeddings_table();
+		$wpdb->query( "TRUNCATE TABLE {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$count = 0;
+		foreach ( $items as $item ) {
+			if ( empty( $item['knowledge_id'] ) || empty( $item['chunk_text'] ) || empty( $item['vector'] ) || ! is_array( $item['vector'] ) ) {
+				continue;
+			}
+			$inserted = false !== $wpdb->insert(
+				$table,
+				array(
+					'knowledge_id' => absint( $item['knowledge_id'] ),
+					'chunk_text'   => self::clean_content( (string) $item['chunk_text'] ),
+					'vector'       => wp_json_encode( array_values( array_map( 'floatval', $item['vector'] ) ) ),
+					'dims'         => count( $item['vector'] ),
+					'created_at'   => current_time( 'mysql' ),
+				),
+				array( '%d', '%s', '%s', '%d', '%s' )
+			);
+			if ( $inserted ) {
+				$count++;
+			}
+		}
+		return $count;
+	}
+
+	public static function rows_for_training(): array {
+		global $wpdb;
+		$table = self::table();
+		$rows = $wpdb->get_results( "SELECT id, title, content FROM {$table} WHERE is_stale = 0 ORDER BY FIELD(type, 'summary') DESC, last_synced DESC", ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return $rows ?: array();
+	}
+
 	public static function total_chars(): int {
 		global $wpdb;
 		$table = self::table();
@@ -201,5 +289,23 @@ class WP_AICHAT_Knowledge {
 		if ( class_exists( 'WP_AICHAT_Cache' ) ) {
 			WP_AICHAT_Cache::bump_version();
 		}
+	}
+
+	private static function cosine_similarity( array $a, array $b ): float {
+		$dot = 0.0;
+		$norm_a = 0.0;
+		$norm_b = 0.0;
+		$count = min( count( $a ), count( $b ) );
+		for ( $i = 0; $i < $count; $i++ ) {
+			$av = (float) $a[ $i ];
+			$bv = (float) $b[ $i ];
+			$dot += $av * $bv;
+			$norm_a += $av * $av;
+			$norm_b += $bv * $bv;
+		}
+		if ( $norm_a <= 0 || $norm_b <= 0 ) {
+			return 0.0;
+		}
+		return $dot / ( sqrt( $norm_a ) * sqrt( $norm_b ) );
 	}
 }
