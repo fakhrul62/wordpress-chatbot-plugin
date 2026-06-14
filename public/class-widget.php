@@ -64,7 +64,7 @@ class WP_AICHAT_Widget {
 		ob_start();
 		?>
 		<style><?php echo esc_html( $style ); ?></style>
-		<div id="wp-aichat-root" class="<?php echo $floating ? 'wp-aichat-floating' : 'wp-aichat-inline'; ?>" data-config="<?php echo esc_attr( $encoded ); ?>">
+		<div id="wp-aichat-root" class="<?php echo esc_attr( ( $floating ? 'wp-aichat-floating ' : 'wp-aichat-inline ' ) . 'wp-aichat-pos-' . sanitize_html_class( $w['position'] ) ); ?>" data-config="<?php echo esc_attr( $encoded ); ?>">
 			<button id="wp-aichat-bubble" type="button" aria-label="<?php esc_attr_e( 'Open chat', 'wp-aichat' ); ?>"><?php echo wp_kses( $icon, self::svg_kses() ); ?></button>
 			<div id="wp-aichat-window" aria-hidden="true">
 				<div id="wp-aichat-header"><?php echo wp_kses( $avatar, self::avatar_kses() ); ?><span class="aichat-botname"><?php echo esc_html( $w['bot_name'] ); ?></span><button class="aichat-close" type="button" aria-label="<?php esc_attr_e( 'Close chat', 'wp-aichat' ); ?>"><?php echo wp_kses( self::icon_x(), self::svg_kses() ); ?></button></div>

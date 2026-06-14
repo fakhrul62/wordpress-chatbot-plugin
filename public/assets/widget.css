@@ -30,7 +30,16 @@
 	display: block;
 	max-width: none;
 }
-#wp-aichat-root.wp-aichat-floating { position: fixed; }
+#wp-aichat-root.wp-aichat-floating {
+	height: 58px;
+	position: fixed;
+	transition: height .2s ease, width .2s ease;
+	width: 58px;
+}
+#wp-aichat-root.wp-aichat-floating.is-open {
+	height: min(calc(100vh - 48px), var(--aichat-height));
+	width: min(calc(100vw - 48px), var(--aichat-width));
+}
 #wp-aichat-root.wp-aichat-inline { position: relative; width: min(100%, var(--aichat-width)); }
 #wp-aichat-bubble {
 	-webkit-appearance: none;
@@ -51,17 +60,23 @@
 	min-width: 58px !important;
 	outline: 0;
 	padding: 0 !important;
-	position: relative;
+	position: absolute;
+	right: 0;
+	bottom: 0;
 	text-align: center !important;
 	width: 58px !important;
-	transition: opacity .16s ease, transform .16s ease, visibility .16s ease;
+	transition: opacity .12s ease, transform .2s ease, visibility .12s ease;
+	z-index: 2;
 }
 #wp-aichat-root.is-open #wp-aichat-bubble {
 	opacity: 0;
 	pointer-events: none;
-	transform: scale(.92);
+	transform: scale(1.16);
 	visibility: hidden;
 }
+#wp-aichat-root.wp-aichat-pos-bottom-left #wp-aichat-bubble { left: 0; right: auto; }
+#wp-aichat-root.wp-aichat-pos-bottom-center #wp-aichat-bubble { left: 50%; right: auto; transform: translateX(-50%); }
+#wp-aichat-root.wp-aichat-pos-bottom-center.is-open #wp-aichat-bubble { transform: translateX(-50%) scale(1.16); }
 #wp-aichat-bubble svg, #wp-aichat-send svg, .aichat-close svg { display: block; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; }
 #wp-aichat-bubble svg { height: 28px !important; margin: 0 !important; stroke-width: 1.8; transform: translate(2px, 0); width: 28px !important; }
 #wp-aichat-send svg, .aichat-close svg { width: 24px; height: 24px; stroke-width: 1.8; }
@@ -69,9 +84,9 @@
 #wp-aichat-window {
 	position: absolute;
 	right: 0;
-	bottom: 72px;
-	width: min(calc(100vw - 32px), var(--aichat-width));
-	height: min(calc(100vh - 110px), var(--aichat-height));
+	bottom: 0;
+	width: 100%;
+	height: 100%;
 	background: var(--aichat-window-bg);
 	border: 1px solid rgba(0,0,0,.12);
 	border-radius: var(--aichat-radius);
@@ -81,12 +96,16 @@
 	display: flex;
 	flex-direction: column;
 	opacity: 0;
-	transform: translateY(10px);
+	transform: scale(.18);
+	transform-origin: right bottom;
 	pointer-events: none;
-	transition: opacity .18s ease, transform .18s ease;
+	transition: opacity .18s ease, transform .22s ease;
 }
+#wp-aichat-root.wp-aichat-pos-bottom-left #wp-aichat-window { left: 0; right: auto; transform-origin: left bottom; }
+#wp-aichat-root.wp-aichat-pos-bottom-center #wp-aichat-window { left: 0; right: auto; transform: scale(.18); transform-origin: center bottom; }
 #wp-aichat-root.wp-aichat-inline #wp-aichat-window { position: relative; right: auto; bottom: auto; width: 100%; opacity: 1; transform: none; pointer-events: auto; }
 #wp-aichat-root.is-open #wp-aichat-window { opacity: 1; transform: translateY(0); pointer-events: auto; }
+#wp-aichat-root.wp-aichat-pos-bottom-center.is-open #wp-aichat-window { transform: scale(1); }
 #wp-aichat-header {
 	min-height: 58px;
 	padding: 12px 14px;
@@ -179,16 +198,31 @@
 #wp-aichat-send svg { transform: translateX(1px); }
 #wp-aichat-send:disabled { opacity: .55; cursor: not-allowed; }
 @media (max-width: 480px) {
-	#wp-aichat-root.wp-aichat-floating { right: 12px !important; left: 12px !important; bottom: 12px !important; transform: none !important; }
-	#wp-aichat-root.wp-aichat-floating:not(.is-open) { bottom: 86px !important; }
-	#wp-aichat-root.wp-aichat-floating.is-open { bottom: 12px !important; }
-	#wp-aichat-root.wp-aichat-floating #wp-aichat-bubble { height: 56px !important; margin-left: auto !important; min-height: 56px !important; min-width: 56px !important; width: 56px !important; }
+	#wp-aichat-root.wp-aichat-floating {
+		bottom: 16px !important;
+		height: 56px;
+		left: auto !important;
+		right: 16px !important;
+		transform: none !important;
+		width: 56px;
+	}
+	#wp-aichat-root.wp-aichat-floating.wp-aichat-pos-bottom-left:not(.is-open) { left: 16px !important; right: auto !important; }
+	#wp-aichat-root.wp-aichat-floating.wp-aichat-pos-bottom-center:not(.is-open) { left: 50% !important; right: auto !important; transform: translateX(-50%) !important; }
+	#wp-aichat-root.wp-aichat-floating.is-open {
+		bottom: 12px !important;
+		height: min(620px, calc(100vh - 24px));
+		left: 12px !important;
+		right: 12px !important;
+		transform: none !important;
+		width: auto;
+	}
+	#wp-aichat-root.wp-aichat-floating #wp-aichat-bubble { height: 56px !important; min-height: 56px !important; min-width: 56px !important; width: 56px !important; }
 	#wp-aichat-root.wp-aichat-floating #wp-aichat-bubble svg { height: 27px !important; width: 27px !important; }
 	#wp-aichat-window {
 		bottom: 0;
-		height: min(620px, calc(100vh - 24px));
+		height: 100%;
 		max-height: calc(100vh - 24px);
-		width: calc(100vw - 24px);
+		width: 100%;
 	}
 	#wp-aichat-header { min-height: 64px; padding: 12px; }
 	#wp-aichat-input-area { gap: 8px; padding: 10px; }
