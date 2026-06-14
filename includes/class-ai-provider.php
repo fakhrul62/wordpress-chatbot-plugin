@@ -197,7 +197,7 @@ class WP_AICHAT_AI_Provider {
 
 	private static function is_services_question( string $message ): bool {
 		$message = strtolower( $message );
-		foreach ( array( 'service', 'services', 'offer', 'offers', 'do you do', 'what do you provide', 'what can you do' ) as $term ) {
+		foreach ( array( 'service', 'services', 'offer', 'offers', 'provide', 'provides', 'do you do', 'what do you provide', 'what can you do' ) as $term ) {
 			if ( str_contains( $message, $term ) ) {
 				return true;
 			}
@@ -231,6 +231,9 @@ class WP_AICHAT_AI_Provider {
 			if ( self::is_noisy_price_context( $context ) ) {
 				continue;
 			}
+			if ( ! self::is_pricing_context( $context ) ) {
+				continue;
+			}
 			$label = self::price_label( $context, $price );
 			$key = strtolower( $label . '|' . $price );
 			$items[ $key ] = array(
@@ -240,7 +243,7 @@ class WP_AICHAT_AI_Provider {
 		}
 
 		if ( empty( $items ) ) {
-			return __( 'I could not find an exact price in the site knowledge base. Please contact the site directly for accurate pricing.', 'wp-aichat' );
+			return __( 'We do not have an exact public price listed in the site knowledge base. Please contact us directly for accurate pricing.', 'wp-aichat' );
 		}
 
 		$lines = array();
@@ -248,7 +251,7 @@ class WP_AICHAT_AI_Provider {
 			$lines[] = '- ' . $item['label'] . ': ' . $item['price'];
 		}
 
-		return "I found these exact prices:\n\n" . implode( "\n", $lines );
+		return "Our listed pricing is:\n\n" . implode( "\n", $lines );
 	}
 
 	private static function price_context( string $text, int $offset ): string {
@@ -258,7 +261,11 @@ class WP_AICHAT_AI_Provider {
 	}
 
 	private static function is_noisy_price_context( string $context ): bool {
-		return (bool) preg_match( '/reasonable|competitive|affordable|cheap|best price|fair price|estimate only/i', $context );
+		return (bool) preg_match( '/reasonable|competitive|affordable|cheap|best price|fair price|estimate only|salary|job opening|career|careers|role|hiring|vacancy|locationonsite/i', $context );
+	}
+
+	private static function is_pricing_context( string $context ): bool {
+		return (bool) preg_match( '/price|pricing|cost|fee|charge|rate|starting from|starts from|from|package|plan|service|product|course/i', $context );
 	}
 
 	private static function price_label( string $context, string $price ): string {
@@ -288,7 +295,7 @@ class WP_AICHAT_AI_Provider {
 
 		$service_names = self::extract_service_names( $text );
 		if ( empty( $service_names ) ) {
-			return __( 'I could not find a clean services list in the site knowledge base. Please check the Services page for the latest details.', 'wp-aichat' );
+			return __( 'We do not have a clean services or offerings list in the site knowledge base yet. Please check the relevant page or contact us directly for details.', 'wp-aichat' );
 		}
 
 		$lines = array_map(
@@ -296,7 +303,7 @@ class WP_AICHAT_AI_Provider {
 			array_slice( $service_names, 0, 10 )
 		);
 
-		return "They offer these services:\n\n" . implode( "\n", $lines );
+		return "We provide:\n\n" . implode( "\n", $lines );
 	}
 
 	private static function extract_service_names( string $text ): array {
@@ -423,6 +430,9 @@ class WP_AICHAT_AI_Provider {
 		if ( in_array( $message, array( 'hi', 'hello', 'hey', 'salam', 'assalamualaikum' ), true ) ) {
 			return __( 'Hi! How can I help you today?', 'wp-aichat' );
 		}
+		if ( self::is_source_question( $message ) ) {
+			return __( 'I answer from the public site content and any custom knowledge entries added by the site admin. If something looks incorrect, please refresh the crawl or update the knowledge base.', 'wp-aichat' );
+		}
 
 		$knowledge = trim( wp_strip_all_tags( $knowledge ) );
 		if ( '' === $knowledge ) {
@@ -440,6 +450,9 @@ class WP_AICHAT_AI_Provider {
 		$sentences = self::knowledge_sentences( $knowledge );
 		$terms     = preg_split( '/\s+/', strtolower( sanitize_text_field( $message ) ) );
 		$terms     = self::meaningful_terms( $terms ?: array() );
+		if ( empty( $terms ) ) {
+			return self::not_found_answer();
+		}
 		$scored    = array();
 
 		foreach ( $sentences as $sentence ) {
@@ -453,7 +466,7 @@ class WP_AICHAT_AI_Provider {
 					$score++;
 				}
 			}
-			if ( $score < 1 ) {
+			if ( $score < self::minimum_score( $terms ) ) {
 				continue;
 			}
 			$scored[] = array(
@@ -464,19 +477,24 @@ class WP_AICHAT_AI_Provider {
 
 		usort( $scored, static fn( $a, $b ) => $b['score'] <=> $a['score'] );
 		$best = array_slice( $scored, 0, 3 );
-		if ( empty( $best ) || ( $best[0]['score'] ?? 0 ) < 1 ) {
+		if ( empty( $best ) || ( $best[0]['score'] ?? 0 ) < self::minimum_score( $terms ) ) {
 			return self::not_found_answer();
 		}
 
-		$lines = array_map(
-			static fn( $row ) => '- ' . $row['text'],
-			$best
-		);
-		return "Here is what I found:\n\n" . implode( "\n", $lines );
+		return self::site_voice_summary( array_column( $best, 'text' ) );
+	}
+
+	private static function is_source_question( string $message ): bool {
+		foreach ( array( 'where do you find', 'where did you find', 'source', 'where from', 'how do you know' ) as $term ) {
+			if ( str_contains( $message, $term ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static function meaningful_terms( array $terms ): array {
-		$stop_words = array( 'what', 'which', 'where', 'when', 'how', 'can', 'could', 'would', 'should', 'the', 'and', 'for', 'with', 'you', 'your', 'are', 'that', 'this', 'there', 'have', 'has', 'about', 'tell', 'give', 'info', 'information' );
+		$stop_words = array( 'what', 'which', 'where', 'when', 'how', 'can', 'could', 'would', 'should', 'the', 'and', 'for', 'with', 'you', 'your', 'are', 'that', 'this', 'there', 'have', 'has', 'about', 'tell', 'give', 'info', 'information', 'find', 'found', 'right', 'site', 'does', 'provide' );
 		$clean = array();
 		foreach ( $terms as $term ) {
 			$term = strtolower( preg_replace( '/[^a-z0-9]+/i', '', (string) $term ) );
@@ -502,7 +520,7 @@ class WP_AICHAT_AI_Provider {
 		if ( strlen( $sentence ) < 18 ) {
 			return true;
 		}
-		if ( preg_match( '/request job estimate|view all|claim offer|testimonial|they cleared|explained what caused|satisfaction guaranteed/i', $sentence ) ) {
+		if ( preg_match( '/request job estimate|view all|claim offer|testimonial|they cleared|explained what caused|satisfaction guaranteed|job opening|career|careers|salary|locationonsite|right role/i', $sentence ) ) {
 			return true;
 		}
 		if ( preg_match( '/reasonable|competitive prices|competitive pricing|affordable/i', $sentence ) ) {
@@ -512,8 +530,31 @@ class WP_AICHAT_AI_Provider {
 		return $word_count > 34;
 	}
 
+	private static function minimum_score( array $terms ): int {
+		return count( $terms ) >= 2 ? 2 : 1;
+	}
+
+	private static function site_voice_summary( array $sentences ): string {
+		$sentences = array_values( array_filter( array_map( 'trim', $sentences ) ) );
+		if ( empty( $sentences ) ) {
+			return self::not_found_answer();
+		}
+		$lead = self::to_site_voice( $sentences[0] );
+		if ( 1 === count( $sentences ) ) {
+			return $lead;
+		}
+		$details = array_map( static fn( $sentence ) => '- ' . self::to_site_voice( $sentence ), array_slice( $sentences, 1, 2 ) );
+		return $lead . "\n\n" . implode( "\n", $details );
+	}
+
+	private static function to_site_voice( string $sentence ): string {
+		$sentence = preg_replace( '/\b(?:the company|this site|the site|they|them)\b/i', 'we', $sentence );
+		$sentence = preg_replace( '/\btheir\b/i', 'our', (string) $sentence );
+		return trim( (string) $sentence );
+	}
+
 	private static function not_found_answer(): string {
-		return __( 'I could not find a clear answer in the site knowledge base. Please check the relevant page or contact the site directly for the most accurate information.', 'wp-aichat' );
+		return __( 'We do not have a clear answer for that in the site knowledge base yet. Please contact us directly, or ask the site admin to add this information to the knowledge base.', 'wp-aichat' );
 	}
 
 	private static function provider_blocked( string $provider ): bool {

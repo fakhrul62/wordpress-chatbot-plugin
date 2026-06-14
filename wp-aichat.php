@@ -2,7 +2,7 @@
 /**
  * Plugin Name: WP AI Chat
  * Description: Site-aware online AI chat widget with a WordPress knowledge base.
- * Version: 1.0.20
+ * Version: 1.0.21
  * Requires at least: 6.0
  * Requires PHP: 8.0
  * Author: Fakhrul Alam
@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WP_AICHAT_VERSION', '1.0.20' );
+define( 'WP_AICHAT_VERSION', '1.0.21' );
 define( 'WP_AICHAT_MIN_WP', '6.0' );
 define( 'WP_AICHAT_MIN_PHP', '8.0' );
 define( 'WP_AICHAT_FILE', __FILE__ );

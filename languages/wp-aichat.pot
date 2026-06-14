@@ -2,7 +2,7 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP AI Chat 1.0.20\n"
+"Project-Id-Version: WP AI Chat 1.0.21\n"
 "Report-Msgid-Bugs-To: https://github.com/fakhrul62/wordpress-chatbot-plugin\n"
 "POT-Creation-Date: 2026-06-14 00:00+0000\n"
 "MIME-Version: 1.0\n"
@@ -78,6 +78,24 @@ msgid "Free fallback is configured. Add an OpenAI API key for more reliable 24/7
 msgstr ""
 
 msgid "The AI provider returned an empty response."
+msgstr ""
+
+msgid "We do not have an exact public price listed in the site knowledge base. Please contact us directly for accurate pricing."
+msgstr ""
+
+msgid "Our listed pricing is:"
+msgstr ""
+
+msgid "We provide:"
+msgstr ""
+
+msgid "We do not have a clean services or offerings list in the site knowledge base yet. Please check the relevant page or contact us directly for details."
+msgstr ""
+
+msgid "I answer from the public site content and any custom knowledge entries added by the site admin. If something looks incorrect, please refresh the crawl or update the knowledge base."
+msgstr ""
+
+msgid "We do not have a clear answer for that in the site knowledge base yet. Please contact us directly, or ask the site admin to add this information to the knowledge base."
 msgstr ""
 
 msgid "Pollinations is temporarily skipped after repeated failures."

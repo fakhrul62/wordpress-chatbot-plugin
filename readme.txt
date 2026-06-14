@@ -4,7 +4,7 @@ Tags: ai, chatbot, chat, knowledge base, support
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.0
-Stable tag: 1.0.20
+Stable tag: 1.0.21
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -51,6 +51,10 @@ No. API keys are stored server-side, encrypted at rest where OpenSSL is availabl
 No. Product crawling is intentionally excluded.
 
 == Changelog ==
+
+= 1.0.21 =
+* Improved fallback answer voice so local fallback speaks as the site instead of saying "Here is what I found."
+* Tightened fallback confidence checks and filtered job/salary snippets from pricing answers.
 
 = 1.0.20 =
 * Added explicit AI mode selection.
