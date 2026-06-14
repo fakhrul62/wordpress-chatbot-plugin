@@ -2,7 +2,7 @@
 # This file is distributed under the GPLv2 or later.
 msgid ""
 msgstr ""
-"Project-Id-Version: WP AI Chat 1.0.22\n"
+"Project-Id-Version: WP AI Chat 1.0.23\n"
 "Report-Msgid-Bugs-To: https://github.com/fakhrul62/wordpress-chatbot-plugin\n"
 "POT-Creation-Date: 2026-06-14 00:00+0000\n"
 "MIME-Version: 1.0\n"
@@ -141,6 +141,12 @@ msgid "I answer from the public site content and any custom knowledge entries ad
 msgstr ""
 
 msgid "We do not have a clear answer for that in the site knowledge base yet. Please contact us directly, or ask the site admin to add this information to the knowledge base."
+msgstr ""
+
+msgid "Yes. If you want to speak with a person, please use the contact form or contact details on this site. I can also help answer questions here while you wait."
+msgstr ""
+
+msgid "Yes. You can reach our team directly through these contact details:"
 msgstr ""
 
 msgid "Pollinations is temporarily skipped after repeated failures."

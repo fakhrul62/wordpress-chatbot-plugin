@@ -471,6 +471,9 @@ class WP_AICHAT_AI_Provider {
 		if ( in_array( $message, array( 'hi', 'hello', 'hey', 'salam', 'assalamualaikum' ), true ) ) {
 			return __( 'Hi! How can I help you today?', 'wp-aichat' );
 		}
+		if ( self::is_human_handoff_question( $message ) ) {
+			return self::human_handoff_answer( $knowledge );
+		}
 		if ( self::is_source_question( $message ) ) {
 			return __( 'I answer from the public site content and any custom knowledge entries added by the site admin. If something looks incorrect, please refresh the crawl or update the knowledge base.', 'wp-aichat' );
 		}
@@ -532,6 +535,23 @@ class WP_AICHAT_AI_Provider {
 			}
 		}
 		return false;
+	}
+
+	private static function is_human_handoff_question( string $message ): bool {
+		foreach ( array( 'human', 'real person', 'person', 'agent', 'representative', 'support team', 'talk to someone', 'speak to someone', 'site admin', 'admin', 'owner', 'staff' ) as $term ) {
+			if ( str_contains( $message, $term ) ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static function human_handoff_answer( string $knowledge ): string {
+		$contact = self::contact_answer( $knowledge );
+		if ( ! str_contains( $contact, 'Phone:' ) && ! str_contains( $contact, 'Email:' ) && ! str_contains( $contact, 'Address:' ) ) {
+			return __( 'Yes. If you want to speak with a person, please use the contact form or contact details on this site. I can also help answer questions here while you wait.', 'wp-aichat' );
+		}
+		return __( 'Yes. You can reach our team directly through these contact details:', 'wp-aichat' ) . "\n\n" . preg_replace( '/^You can contact them here:\s*/', '', $contact );
 	}
 
 	private static function meaningful_terms( array $terms ): array {

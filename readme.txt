@@ -4,7 +4,7 @@ Tags: ai, chatbot, chat, knowledge base, support
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.0
-Stable tag: 1.0.22
+Stable tag: 1.0.23
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -53,6 +53,9 @@ No. API keys are stored server-side, encrypted at rest where OpenSSL is availabl
 No. Product crawling is intentionally excluded.
 
 == Changelog ==
+
+= 1.0.23 =
+* Improved human handoff answers for visitors asking to talk to a real person, admin, owner, or support staff.
 
 = 1.0.22 =
 * Added Train Site workflow for AI-generated site summary.

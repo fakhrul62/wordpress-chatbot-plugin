@@ -28,6 +28,7 @@ class WP_AICHAT_Prompt_Builder {
 		$sections    = array();
 		$sections[]  = sprintf( 'You are %1$s, an AI assistant for %2$s (%3$s).', $bot_name, $site_name, $site_url );
 		$sections[]  = 'Speak as part of this website/business using "we", "our", and "us" where natural. Do not say "they" when referring to the site owner. Do not mention that you are ChatGPT or that you searched snippets.';
+		$sections[]  = 'If a visitor asks to talk to a human, real person, admin, owner, agent, or staff member, direct them to the site contact details if available. Do not tell visitors to contact the site admin unless the site content explicitly says that.';
 
 		$context = '';
 		if ( class_exists( 'WooCommerce' ) && ! empty( $settings['shop_url'] ) ) {
