@@ -12,13 +12,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WP_AICHAT_AI_Provider {
 	public static function generate_from_settings( array $settings, string $prompt, array $contents, string $knowledge = '' ) {
 		$message = self::latest_user_message( $contents );
+		$mode    = $settings['ai_mode'] ?? 'openai_fallback';
 
-		if ( ! empty( $settings['openai_api_key'] ) ) {
+		if ( 'free_only' !== $mode && ! empty( $settings['openai_api_key'] ) ) {
 			$reliable = self::generate_openai( $settings, $prompt, $contents );
 			if ( ! is_wp_error( $reliable ) ) {
 				return $reliable;
 			}
 			self::record_failure( 'openai', $reliable, $settings );
+			if ( 'openai_only' === $mode ) {
+				return self::knowledge_fallback( $message, $knowledge );
+			}
+		} elseif ( 'openai_only' === $mode ) {
+			return self::knowledge_fallback( $message, $knowledge );
 		}
 
 		$primary = self::generate_pollinations( $settings, $prompt, $contents );
@@ -77,103 +83,52 @@ class WP_AICHAT_AI_Provider {
 			return new WP_Error( 'aichat_openai_missing_key', __( 'OpenAI API key is missing.', 'wp-aichat' ) );
 		}
 
-		$messages = array( array( 'role' => 'system', 'content' => $prompt ) );
-		foreach ( $contents as $content ) {
-			$role = isset( $content['role'] ) && 'model' === $content['role'] ? 'assistant' : 'user';
-			$text = $content['parts'][0]['text'] ?? '';
-			if ( '' !== $text ) {
-				$messages[] = array( 'role' => $role, 'content' => $text );
-			}
-		}
-
-		$response = wp_remote_post(
+		return self::call_chat_completion(
+			'openai',
 			'https://api.openai.com/v1/chat/completions',
 			array(
-				'timeout' => 15,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $api_key,
-					'Content-Type'  => 'application/json',
-				),
-				'body'    => wp_json_encode(
-					array(
-						'model'       => ! empty( $settings['openai_model'] ) ? $settings['openai_model'] : 'gpt-4o-mini',
-						'messages'    => $messages,
-						'max_tokens'  => 800,
-						'temperature' => 0.3,
-					)
-				),
-			)
+				'Authorization' => 'Bearer ' . $api_key,
+				'Content-Type'  => 'application/json',
+			),
+			! empty( $settings['openai_model'] ) ? $settings['openai_model'] : 'gpt-4o-mini',
+			self::messages( $prompt, $contents ),
+			800,
+			0.3
 		);
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$code = (int) wp_remote_retrieve_response_code( $response );
-		$json = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( 200 !== $code ) {
-			$message = isset( $json['error']['message'] ) ? sanitize_text_field( $json['error']['message'] ) : sprintf( __( 'OpenAI request failed with HTTP %d.', 'wp-aichat' ), $code );
-			return new WP_Error( 'aichat_openai_error', $message );
-		}
-
-		$text = $json['choices'][0]['message']['content'] ?? '';
-		$text = self::clean_ai_answer( (string) $text );
-		return '' !== $text ? $text : new WP_Error( 'aichat_openai_empty', __( 'OpenAI returned an empty response.', 'wp-aichat' ) );
 	}
 
 	private static function generate_pollinations( array $settings, string $prompt, array $contents, bool $force = false ) {
 		if ( ! $force && self::provider_blocked( 'pollinations' ) ) {
 			return new WP_Error( 'aichat_provider_blocked', __( 'Pollinations is temporarily skipped after repeated failures.', 'wp-aichat' ) );
 		}
-		$model    = ! empty( $settings['ai_model'] ) ? $settings['ai_model'] : 'openai-fast';
-		$messages = array( array( 'role' => 'system', 'content' => $prompt ) );
-
-		foreach ( $contents as $content ) {
-			$role = isset( $content['role'] ) && 'model' === $content['role'] ? 'assistant' : 'user';
-			$text = $content['parts'][0]['text'] ?? '';
-			if ( '' !== $text ) {
-				$messages[] = array( 'role' => $role, 'content' => $text );
-			}
-		}
-
-		$response = wp_remote_post(
+		return self::call_chat_completion(
+			'pollinations',
 			'https://text.pollinations.ai/openai',
-			array(
-				'timeout' => 15,
-				'headers' => array( 'Content-Type' => 'application/json' ),
-				'body'    => wp_json_encode(
-					array(
-						'model'       => $model,
-						'messages'    => $messages,
-						'max_tokens'  => 700,
-						'temperature' => 0.5,
-						'safe'        => true,
-						'stream'      => false,
-					)
-				),
-			)
+			array( 'Content-Type' => 'application/json' ),
+			! empty( $settings['ai_model'] ) ? $settings['ai_model'] : 'openai-fast',
+			self::messages( $prompt, $contents ),
+			700,
+			0.5,
+			array( 'safe' => true, 'stream' => false )
 		);
-
-		if ( is_wp_error( $response ) ) {
-			return $response;
-		}
-
-		$code = (int) wp_remote_retrieve_response_code( $response );
-		$json = json_decode( wp_remote_retrieve_body( $response ), true );
-		if ( 200 !== $code ) {
-			$message = isset( $json['error']['message'] ) ? sanitize_text_field( $json['error']['message'] ) : sprintf( __( 'The online AI request failed with HTTP %d. The free service may be temporarily rate limited.', 'wp-aichat' ), $code );
-			return new WP_Error( 'aichat_online_ai_error', $message );
-		}
-
-		$text = $json['choices'][0]['message']['content'] ?? '';
-		$text = self::clean_ai_answer( (string) $text );
-		return '' !== $text ? $text : new WP_Error( 'aichat_online_ai_empty', __( 'The online AI service returned an empty response.', 'wp-aichat' ) );
 	}
 
 	private static function generate_ovh( string $prompt, array $contents, bool $force = false ) {
 		if ( ! $force && self::provider_blocked( 'ovh' ) ) {
 			return new WP_Error( 'aichat_provider_blocked', __( 'OVH fallback is temporarily skipped after repeated failures.', 'wp-aichat' ) );
 		}
+		return self::call_chat_completion(
+			'ovh',
+			'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions',
+			array( 'Content-Type' => 'application/json' ),
+			'Llama-3.1-8B-Instruct',
+			self::messages( $prompt, $contents ),
+			700,
+			0.5
+		);
+	}
+
+	private static function messages( string $prompt, array $contents ): array {
 		$messages = array( array( 'role' => 'system', 'content' => $prompt ) );
 		foreach ( $contents as $content ) {
 			$role = isset( $content['role'] ) && 'model' === $content['role'] ? 'assistant' : 'user';
@@ -182,18 +137,24 @@ class WP_AICHAT_AI_Provider {
 				$messages[] = array( 'role' => $role, 'content' => $text );
 			}
 		}
+		return $messages;
+	}
 
+	private static function call_chat_completion( string $provider, string $endpoint, array $headers, string $model, array $messages, int $max_tokens, float $temperature, array $extra_body = array() ) {
 		$response = wp_remote_post(
-			'https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/chat/completions',
+			$endpoint,
 			array(
 				'timeout' => 15,
-				'headers' => array( 'Content-Type' => 'application/json' ),
+				'headers' => $headers,
 				'body'    => wp_json_encode(
-					array(
-						'model'       => 'Llama-3.1-8B-Instruct',
+					array_merge(
+						$extra_body,
+						array(
+						'model'       => $model,
 						'messages'    => $messages,
-						'max_tokens'  => 700,
-						'temperature' => 0.5,
+						'max_tokens'  => $max_tokens,
+						'temperature' => $temperature,
+						)
 					)
 				),
 			)
@@ -206,13 +167,13 @@ class WP_AICHAT_AI_Provider {
 		$code = (int) wp_remote_retrieve_response_code( $response );
 		$json = json_decode( wp_remote_retrieve_body( $response ), true );
 		if ( 200 !== $code ) {
-			$message = isset( $json['error']['message'] ) ? sanitize_text_field( $json['error']['message'] ) : sprintf( __( 'The fallback online AI request failed with HTTP %d.', 'wp-aichat' ), $code );
-			return new WP_Error( 'aichat_fallback_ai_error', $message );
+			$message = isset( $json['error']['message'] ) ? sanitize_text_field( $json['error']['message'] ) : sprintf( __( 'The %1$s AI request failed with HTTP %2$d.', 'wp-aichat' ), $provider, $code );
+			return new WP_Error( 'aichat_' . sanitize_key( $provider ) . '_error', $message );
 		}
 
 		$text = $json['choices'][0]['message']['content'] ?? '';
 		$text = self::clean_ai_answer( (string) $text );
-		return '' !== $text ? $text : new WP_Error( 'aichat_fallback_ai_empty', __( 'The fallback online AI service returned an empty response.', 'wp-aichat' ) );
+		return '' !== $text ? $text : new WP_Error( 'aichat_' . sanitize_key( $provider ) . '_empty', __( 'The AI provider returned an empty response.', 'wp-aichat' ) );
 	}
 
 	private static function latest_user_message( array $contents ): string {

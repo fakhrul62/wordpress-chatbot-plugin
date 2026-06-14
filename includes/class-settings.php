@@ -13,6 +13,7 @@ class WP_AICHAT_Settings {
 	public static function defaults(): array {
 		return array(
 			'ai_provider'            => 'pollinations',
+			'ai_mode'                => 'openai_fallback',
 			'ai_model'               => 'openai-fast',
 			'openai_model'           => 'gpt-4o-mini',
 			'openai_api_key'         => '',
@@ -56,6 +57,7 @@ class WP_AICHAT_Settings {
 				'welcome_message'    => 'Hi! How can I help you today?',
 				'input_placeholder'  => 'Type a message...',
 				'shortcode_mode'     => false,
+				'show_powered_by'    => false,
 			),
 		);
 	}
@@ -132,6 +134,7 @@ class WP_AICHAT_Settings {
 
 		unset( $merged['api_key'], $merged['ollama_url'], $merged['openai_api_key_masked'] );
 		$merged['ai_provider']            = 'pollinations';
+		$merged['ai_mode']                = in_array( $merged['ai_mode'], array( 'free_only', 'openai_fallback', 'openai_only' ), true ) ? $merged['ai_mode'] : 'openai_fallback';
 		$merged['ai_model']               = sanitize_text_field( (string) $merged['ai_model'] );
 		$merged['openai_model']           = sanitize_text_field( (string) $merged['openai_model'] );
 		$new_api_key                      = isset( $input['openai_api_key'] ) ? trim( sanitize_text_field( (string) $input['openai_api_key'] ) ) : '';
@@ -183,6 +186,7 @@ class WP_AICHAT_Settings {
 		$w['welcome_message']   = sanitize_text_field( (string) $w['welcome_message'] );
 		$w['input_placeholder'] = sanitize_text_field( (string) $w['input_placeholder'] );
 		$w['shortcode_mode']    = (bool) $w['shortcode_mode'];
+		$w['show_powered_by']   = (bool) $w['show_powered_by'];
 
 		$merged['widget'] = $w;
 		return $merged;

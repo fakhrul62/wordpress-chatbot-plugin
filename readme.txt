@@ -4,7 +4,7 @@ Tags: ai, chatbot, chat, knowledge base, support
 Requires at least: 6.0
 Tested up to: 6.6
 Requires PHP: 8.0
-Stable tag: 1.0.19
+Stable tag: 1.0.20
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -19,10 +19,14 @@ Features:
 * Crawl pages and posts into a local knowledge base.
 * Add custom facts or Q&A entries manually.
 * Optional OpenAI API key with encrypted storage.
+* AI modes: Free only, OpenAI with free fallback, or OpenAI only.
 * Free online fallback providers when no API key is configured or the primary provider fails.
 * Configurable widget design, placement, visibility, tone, language, and content rules.
 * Response caching with scheduled cleanup.
 * Public chat endpoint with IP-based rate limiting.
+* Optional attribution control, disabled by default.
+
+Note: Crawled page content is injected into AI context. Only crawl content you trust, because adversarial text in site content can influence model behavior.
 
 == Installation ==
 
@@ -47,6 +51,14 @@ No. API keys are stored server-side, encrypted at rest where OpenSSL is availabl
 No. Product crawling is intentionally excluded.
 
 == Changelog ==
+
+= 1.0.20 =
+* Added explicit AI mode selection.
+* Shared OpenAI-compatible provider request helper.
+* Added prompt override knowledge placeholder support.
+* Added cache normalization and knowledge-version cache invalidation.
+* Added token-budgeted knowledge injection and prompt-injection notice.
+* Added optional attribution setting.
 
 = 1.0.19 =
 * Hardened API key handling and admin settings responses.

@@ -166,12 +166,20 @@ class WP_AICHAT_REST_API {
 	}
 
 	private static function knowledge_for_message( string $message ): string {
-		if ( WP_AICHAT_Knowledge::total_chars() < 50000 ) {
+		if ( WP_AICHAT_Knowledge::total_chars() < 32000 ) {
 			$chunks = array_map( static fn( $row ) => trim( $row['title'] . "\n" . $row['content'] ), WP_AICHAT_Knowledge::all_content() );
 		} else {
 			$chunks = WP_AICHAT_Knowledge::best_chunks( $message, 5 );
 		}
-		return implode( "\n\n---\n\n", array_filter( $chunks ) );
+		return self::fit_knowledge_budget( implode( "\n\n---\n\n", array_filter( $chunks ) ), 9000 );
+	}
+
+	private static function fit_knowledge_budget( string $knowledge, int $max_tokens ): string {
+		$max_chars = $max_tokens * 4;
+		if ( strlen( $knowledge ) <= $max_chars ) {
+			return $knowledge;
+		}
+		return rtrim( substr( $knowledge, 0, $max_chars ) ) . "\n\n[Knowledge truncated to fit the configured token budget.]";
 	}
 
 	private static function rate_limited() {

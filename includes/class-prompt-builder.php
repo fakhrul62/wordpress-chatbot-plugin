@@ -12,7 +12,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WP_AICHAT_Prompt_Builder {
 	public static function build( array $settings, string $knowledge_chunks = '' ): string {
 		if ( ! empty( $settings['system_prompt_override'] ) ) {
-			return (string) $settings['system_prompt_override'];
+			$override = (string) $settings['system_prompt_override'];
+			if ( str_contains( $override, '{{knowledge}}' ) ) {
+				return str_replace( '{{knowledge}}', $knowledge_chunks, $override );
+			}
+			return $override;
 		}
 
 		$widget      = $settings['widget'];

@@ -16,7 +16,11 @@ class WP_AICHAT_Cache {
 	}
 
 	public static function hash( string $question ): string {
-		return hash( 'sha256', 'v6|' . trim( strtolower( $question ) ) );
+		return hash( 'sha256', self::version() . '|' . self::normalize_question( $question ) );
+	}
+
+	public static function bump_version(): void {
+		update_option( 'wp_aichat_cache_version', (string) time(), false );
 	}
 
 	public static function get( string $hash, int $ttl_hours ): ?string {
@@ -49,5 +53,20 @@ class WP_AICHAT_Cache {
 		$cutoff = gmdate( 'Y-m-d H:i:s', current_time( 'timestamp' ) - ( $ttl_hours * HOUR_IN_SECONDS ) );
 		$table = self::table();
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE created_at < %s", $cutoff ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+	}
+
+	private static function version(): string {
+		$version = get_option( 'wp_aichat_cache_version', 'v7' );
+		return is_string( $version ) && '' !== $version ? $version : 'v7';
+	}
+
+	private static function normalize_question( string $question ): string {
+		$question = strtolower( wp_strip_all_tags( $question ) );
+		$question = preg_replace( '/[^a-z0-9]+/i', ' ', (string) $question );
+		$question = preg_replace( '/\b(?:what|is|are|s|tell|me|can|please|the|your|you|a|an)\b/i', ' ', (string) $question );
+		$question = preg_replace( '/\b(?:price|prices|pricing|cost|costs|fee|fees)\b/i', 'price', (string) $question );
+		$question = preg_replace( '/\b(?:contact|call|phone|email|reach)\b/i', 'contact', (string) $question );
+		$question = preg_replace( '/\b(?:services|service|offer|offers)\b/i', 'service', (string) $question );
+		return trim( preg_replace( '/\s+/', ' ', (string) $question ) );
 	}
 }

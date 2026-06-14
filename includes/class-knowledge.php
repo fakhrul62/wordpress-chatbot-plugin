@@ -198,5 +198,8 @@ class WP_AICHAT_Knowledge {
 
 	private static function flush_cache(): void {
 		delete_transient( 'wp_aichat_all_content' );
+		if ( class_exists( 'WP_AICHAT_Cache' ) ) {
+			WP_AICHAT_Cache::bump_version();
+		}
 	}
 }

@@ -69,6 +69,7 @@ class WP_AICHAT_Widget {
 			<div id="wp-aichat-window" aria-hidden="true">
 				<div id="wp-aichat-header"><?php echo wp_kses( $avatar, self::avatar_kses() ); ?><span class="aichat-botname"><?php echo esc_html( $w['bot_name'] ); ?></span><button class="aichat-close" type="button" aria-label="<?php esc_attr_e( 'Close chat', 'wp-aichat' ); ?>"><?php echo wp_kses( self::icon_x(), self::svg_kses() ); ?></button></div>
 				<div id="wp-aichat-messages" role="log" aria-live="polite"></div>
+				<?php if ( ! empty( $w['show_powered_by'] ) ) : ?><div class="aichat-powered-by"><?php esc_html_e( 'Powered by WP AI Chat', 'wp-aichat' ); ?></div><?php endif; ?>
 				<div id="wp-aichat-input-area"><textarea id="wp-aichat-input" placeholder="<?php echo esc_attr( $w['input_placeholder'] ); ?>" rows="1"></textarea><button id="wp-aichat-send" type="button" aria-label="<?php esc_attr_e( 'Send', 'wp-aichat' ); ?>"><?php echo wp_kses( self::icon_send(), self::svg_kses() ); ?></button></div>
 			</div>
 		</div>

@@ -1,0 +1,90 @@
+# Copyright (C) 2026 Fakhrul Alam
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: WP AI Chat 1.0.20\n"
+"Report-Msgid-Bugs-To: https://github.com/fakhrul62/wordpress-chatbot-plugin\n"
+"POT-Creation-Date: 2026-06-14 00:00+0000\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"X-Generator: Codex\n"
+"X-Domain: wp-aichat\n"
+
+msgid "AI Chat"
+msgstr ""
+
+msgid "Knowledge Base"
+msgstr ""
+
+msgid "AI Configuration"
+msgstr ""
+
+msgid "Widget Designer"
+msgstr ""
+
+msgid "Placement"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Free only"
+msgstr ""
+
+msgid "OpenAI with free fallback"
+msgstr ""
+
+msgid "OpenAI only"
+msgstr ""
+
+msgid "Free fallback providers are best-effort external services with no uptime guarantee. OpenAI-only mode disables silent fallback provider switching."
+msgstr ""
+
+msgid "Test Fallback Chain"
+msgstr ""
+
+msgid "Override system prompt"
+msgstr ""
+
+msgid "This is sent to the selected online AI provider on every conversation. If override is enabled, use {{knowledge}} where site knowledge should be inserted; otherwise the override replaces generated rules and knowledge entirely. Crawled page content is included in AI context and could contain adversarial prompt text, so crawl only content you trust."
+msgstr ""
+
+msgid "Powered by WP AI Chat"
+msgstr ""
+
+msgid "Show optional Powered by WP AI Chat text"
+msgstr ""
+
+msgid "Attribution is optional and disabled by default."
+msgstr ""
+
+msgid "Too many chat requests. Please wait a minute and try again."
+msgstr ""
+
+msgid "Message must be between 1 and 1000 characters."
+msgstr ""
+
+msgid "I could not find a clear answer in the site knowledge base. Please check the relevant page or contact the site directly for the most accurate information."
+msgstr ""
+
+msgid "OpenAI API key is missing."
+msgstr ""
+
+msgid "OpenAI connection successful. If it fails during chat, the free fallback will still be used."
+msgstr ""
+
+msgid "Free fallback is configured. Add an OpenAI API key for more reliable 24/7 answers."
+msgstr ""
+
+msgid "The AI provider returned an empty response."
+msgstr ""
+
+msgid "Pollinations is temporarily skipped after repeated failures."
+msgstr ""
+
+msgid "OVH fallback is temporarily skipped after repeated failures."
+msgstr ""
+
+msgid "The knowledge base has more than 500 rows. Keyword matching may become slower; consider pruning old entries."
+msgstr ""
